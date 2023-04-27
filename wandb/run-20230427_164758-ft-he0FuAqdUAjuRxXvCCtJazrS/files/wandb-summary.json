@@ -1,0 +1,1 @@
+{"elapsed_tokens": 7745.0, "elapsed_examples": 121.0, "training_loss": 0.0226446017608451, "training_sequence_accuracy": 1.0, "training_token_accuracy": 1.0, "_timestamp": 1682610491.2487965, "_runtime": 12.344004392623901, "_step": 121, "fine_tuned_model": "curie:ft-omnicentra-2023-04-03-20-21-08", "status": "succeeded", "_wandb": {"runtime": 15}}

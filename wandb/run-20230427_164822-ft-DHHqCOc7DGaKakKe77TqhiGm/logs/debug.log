@@ -1,0 +1,55 @@
+2023-04-27 16:48:22,416 INFO    MainThread:9660 [wandb_setup.py:_flush():76] Configure stats pid to 9660
+2023-04-27 16:48:22,417 INFO    MainThread:9660 [wandb_setup.py:_flush():76] Loading settings from C:\Users\chiso\.config\wandb\settings
+2023-04-27 16:48:22,417 INFO    MainThread:9660 [wandb_setup.py:_flush():76] Loading settings from C:\Users\chiso\Projects\GPTFineTuneDemo\wandb\settings
+2023-04-27 16:48:22,417 INFO    MainThread:9660 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-04-27 16:48:22,417 INFO    MainThread:9660 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': '..\\..\\Anaconda3\\envs\\OpenAI\\Scripts\\openai-script.py', 'program': 'C:\\Users\\chiso\\Anaconda3\\envs\\OpenAI\\Scripts\\openai-script.py'}
+2023-04-27 16:48:22,417 INFO    MainThread:9660 [wandb_init.py:_log_setup():507] Logging user logs to C:\Users\chiso\Projects\GPTFineTuneDemo\wandb\run-20230427_164822-ft-DHHqCOc7DGaKakKe77TqhiGm\logs\debug.log
+2023-04-27 16:48:22,418 INFO    MainThread:9660 [wandb_init.py:_log_setup():508] Logging internal logs to C:\Users\chiso\Projects\GPTFineTuneDemo\wandb\run-20230427_164822-ft-DHHqCOc7DGaKakKe77TqhiGm\logs\debug-internal.log
+2023-04-27 16:48:22,418 INFO    MainThread:9660 [wandb_init.py:init():547] calling init triggers
+2023-04-27 16:48:22,418 INFO    MainThread:9660 [wandb_init.py:init():554] wandb.init called with sweep_config: {}
+config: {'object': 'fine-tune', 'id': 'ft-DHHqCOc7DGaKakKe77TqhiGm', 'hyperparams': <OpenAIObject at 0x18b7b069590> JSON: {
+  "batch_size": 1,
+  "learning_rate_multiplier": 0.1,
+  "n_epochs": 4,
+  "prompt_loss_weight": 0.01
+}, 'organization_id': 'org-C15lzQ0mQYcGkjGrpiBPk2Hb', 'model': 'davinci', 'training_files': <File file id=file-kQS59zVNvcilsDYwJILuRTyl at 0x18b7b069630> JSON: {
+  "bytes": 5898,
+  "created_at": 1680552771,
+  "filename": "./maths-data.jsonl",
+  "id": "file-kQS59zVNvcilsDYwJILuRTyl",
+  "object": "file",
+  "purpose": "fine-tune",
+  "status": "processed",
+  "status_details": null
+}, 'validation_files': [], 'result_files': <File file id=file-v98eN4hS2TH4tu9AFmduBVHe at 0x18b7b0696d0> JSON: {
+  "bytes": 5686,
+  "created_at": 1680558712,
+  "filename": "compiled_results.csv",
+  "id": "file-v98eN4hS2TH4tu9AFmduBVHe",
+  "object": "file",
+  "purpose": "fine-tune-results",
+  "status": "processed",
+  "status_details": null
+}, 'created_at': datetime.datetime(2023, 4, 3, 21, 16, 22), 'updated_at': 1680558712, 'status': 'succeeded', 'fine_tuned_model': 'davinci:ft-omnicentra-2023-04-03-21-51-51'}
+2023-04-27 16:48:22,418 INFO    MainThread:9660 [wandb_init.py:init():595] starting backend
+2023-04-27 16:48:22,418 INFO    MainThread:9660 [wandb_init.py:init():599] setting up manager
+2023-04-27 16:48:22,422 INFO    MainThread:9660 [backend.py:_multiprocessing_setup():106] multiprocessing start_methods=spawn, using: spawn
+2023-04-27 16:48:22,425 INFO    MainThread:9660 [wandb_init.py:init():605] backend started and connected
+2023-04-27 16:48:22,427 INFO    MainThread:9660 [wandb_init.py:init():695] updated telemetry
+2023-04-27 16:48:22,429 INFO    MainThread:9660 [wandb_init.py:init():732] communicating run to backend with 60.0 second timeout
+2023-04-27 16:48:23,081 INFO    MainThread:9660 [wandb_run.py:_on_init():2176] communicating current version
+2023-04-27 16:48:23,204 INFO    MainThread:9660 [wandb_run.py:_on_init():2185] got version response 
+2023-04-27 16:48:23,204 INFO    MainThread:9660 [wandb_init.py:init():782] starting run threads in backend
+2023-04-27 16:48:35,146 INFO    MainThread:9660 [wandb_run.py:_console_start():2157] atexit reg
+2023-04-27 16:48:35,147 INFO    MainThread:9660 [wandb_run.py:_redirect():2012] redirect: SettingsConsole.WRAP_RAW
+2023-04-27 16:48:35,147 INFO    MainThread:9660 [wandb_run.py:_redirect():2077] Wrapping output streams.
+2023-04-27 16:48:35,147 INFO    MainThread:9660 [wandb_run.py:_redirect():2102] Redirects installed.
+2023-04-27 16:48:35,148 INFO    MainThread:9660 [wandb_init.py:init():824] run started, returning control to user process
+2023-04-27 16:48:35,372 INFO    MainThread:9660 [wandb_run.py:_config_callback():1285] config_cb None None {'n_train': 30}
+2023-04-27 16:48:36,067 INFO    MainThread:9660 [wandb_run.py:_finish():1892] finishing run chipzstar/GPT-3/ft-DHHqCOc7DGaKakKe77TqhiGm
+2023-04-27 16:48:36,068 INFO    MainThread:9660 [wandb_run.py:_atexit_cleanup():2126] got exitcode: 0
+2023-04-27 16:48:36,068 INFO    MainThread:9660 [wandb_run.py:_restore():2109] restore
+2023-04-27 16:48:36,068 INFO    MainThread:9660 [wandb_run.py:_restore():2115] restore done
+2023-04-27 16:48:41,581 INFO    MainThread:9660 [wandb_run.py:_footer_history_summary_info():3476] rendering history
+2023-04-27 16:48:41,582 INFO    MainThread:9660 [wandb_run.py:_footer_history_summary_info():3508] rendering summary
+2023-04-27 16:48:41,590 INFO    MainThread:9660 [wandb_run.py:_footer_sync_info():3434] logging synced files

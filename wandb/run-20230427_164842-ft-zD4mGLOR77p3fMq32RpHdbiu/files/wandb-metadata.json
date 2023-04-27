@@ -1,0 +1,49 @@
+{
+    "os": "Windows-10-10.0.19044-SP0",
+    "python": "3.8.16",
+    "heartbeatAt": "2023-04-27T15:48:43.332316",
+    "startedAt": "2023-04-27T15:48:42.356324",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "-k",
+        "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",
+        "wandb",
+        "sync"
+    ],
+    "state": "running",
+    "program": "C:\\Users\\chiso\\Anaconda3\\envs\\OpenAI\\Scripts\\openai-script.py",
+    "codePath": "..\\..\\Anaconda3\\envs\\OpenAI\\Scripts\\openai-script.py",
+    "host": "AMD-Ryzen-PC",
+    "username": "chisom",
+    "executable": "C:\\Users\\chiso\\Anaconda3\\envs\\OpenAI\\python.exe",
+    "cpu_count": 4,
+    "cpu_count_logical": 4,
+    "cpu_freq": {
+        "current": 3100.0,
+        "min": 0.0,
+        "max": 3100.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3100.0,
+            "min": 0.0,
+            "max": 3100.0
+        }
+    ],
+    "disk": {
+        "total": 465.16112899780273,
+        "used": 380.98155975341797
+    },
+    "gpu": "NVIDIA GeForce GTX 1050 Ti",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce GTX 1050 Ti",
+            "memory_total": 4294967296
+        }
+    ],
+    "memory": {
+        "total": 15.952587127685547
+    }
+}

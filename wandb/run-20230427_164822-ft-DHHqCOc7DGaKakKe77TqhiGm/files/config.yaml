@@ -1,0 +1,85 @@
+wandb_version: 1
+
+object:
+  desc: null
+  value: fine-tune
+id:
+  desc: null
+  value: ft-DHHqCOc7DGaKakKe77TqhiGm
+hyperparams:
+  desc: null
+  value:
+    n_epochs: 4
+    batch_size: 1
+    prompt_loss_weight: 0.01
+    learning_rate_multiplier: 0.1
+organization_id:
+  desc: null
+  value: org-C15lzQ0mQYcGkjGrpiBPk2Hb
+model:
+  desc: null
+  value: davinci
+training_files:
+  desc: null
+  value:
+    object: file
+    id: file-kQS59zVNvcilsDYwJILuRTyl
+    purpose: fine-tune
+    filename: ./maths-data.jsonl
+    bytes: 5898
+    created_at: 1680552771
+    status: processed
+    status_details: null
+validation_files:
+  desc: null
+  value: []
+result_files:
+  desc: null
+  value:
+    object: file
+    id: file-v98eN4hS2TH4tu9AFmduBVHe
+    purpose: fine-tune-results
+    filename: compiled_results.csv
+    bytes: 5686
+    created_at: 1680558712
+    status: processed
+    status_details: null
+created_at:
+  desc: null
+  value: '2023-04-03T21:16:22'
+updated_at:
+  desc: null
+  value: 1680558712
+status:
+  desc: null
+  value: succeeded
+fine_tuned_model:
+  desc: null
+  value: davinci:ft-omnicentra-2023-04-03-21-51-51
+_wandb:
+  desc: null
+  value:
+    python_version: 3.8.16
+    cli_version: 0.15.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1682610502.425326
+    t:
+      1:
+      - 55
+      2:
+      - 55
+      3:
+      - 2
+      - 13
+      - 14
+      - 16
+      - 23
+      4: 3.8.16
+      5: 0.15.0
+      8:
+      - 3
+      - 5
+n_train:
+  desc: null
+  value: 30

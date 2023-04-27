@@ -1,0 +1,1 @@
+{"elapsed_tokens": 7866.0, "elapsed_examples": 122.0, "training_loss": 0.0409001749766202, "training_sequence_accuracy": 0.0, "training_token_accuracy": 0.9912280701754386, "_timestamp": 1682610515.1993136, "_runtime": 12.773987531661987, "_step": 122, "fine_tuned_model": "davinci:ft-omnicentra-2023-04-03-21-51-51", "status": "succeeded", "_wandb": {"runtime": 12}}
