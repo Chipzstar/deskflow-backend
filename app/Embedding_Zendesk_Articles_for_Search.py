@@ -146,8 +146,8 @@ len(articles)
 
 
 def create_txt_knowledge_base(articles):
-    if not os.path.exists("knowledge_base"):
-        os.mkdir("knowledge_base")
+    if not os.path.exists("../knowledge_base"):
+        os.mkdir("../knowledge_base")
 
     with open(f"knowledge_base/base_{get_date_string()}.txt", "w") as file:
         for article in articles:
@@ -344,7 +344,7 @@ store_embeddings_into_pinecone(EMBEDDINGS, index)
 
 QUERIES = []
 # removing the new line characters
-with open('test/queries.txt') as f:
+with open('../test/queries.txt') as f:
     lines = [line.rstrip() for line in f]
     for line in lines:
         QUERIES.append(line)

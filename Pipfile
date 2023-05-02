@@ -3,6 +3,9 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[scripts]
+reqs = "pipenv requirements > requirements.txt"
+
 [packages]
 openai = "*"
 zenpy = "*"
@@ -18,6 +21,10 @@ spatial = "*"
 scipy = "*"
 black = {extras = ["d"], version = "*"}
 nbconvert = "*"
+fastapi = "*"
+uvicorn = "*"
+pylint = "*"
+httpie = "*"
 
 [dev-packages]
 
