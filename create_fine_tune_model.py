@@ -2,6 +2,7 @@ import os
 import sys
 import openai
 import json
+
 # Import the Zenpy Class
 from zenpy import Zenpy
 from zenpy.lib.api_objects import Ticket
@@ -15,18 +16,19 @@ def open_file(filepath):
         return infile.read()
 
 
-openai.api_key = open_file("openai_api_key.txt")
+openai.api_key = open_file("keys/openai_api_key.txt")
 
 
 def create_openai_FTmodel(dataset, model_engine="davinci", num_epochs=3, batch_size=4):
-    openai.FineTune.create({
-        dataset: dataset,
-        model_engine: model_engine,
-    })
+    openai.FineTune.create(
+        {
+            dataset: dataset,
+            model_engine: model_engine,
+        }
+    )
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # total arguments
     n = len(sys.argv)
     print("Total arguments passed:", n)

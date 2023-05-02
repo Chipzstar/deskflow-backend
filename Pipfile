@@ -1,0 +1,25 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+openai = "*"
+zenpy = "*"
+mwclient = "*"
+mwparserfromhell = "*"
+pandas = "*"
+tiktoken = "*"
+jupyter = "*"
+numpy = "*"
+pinecone-client = "*"
+tqdm = "*"
+spatial = "*"
+scipy = "*"
+black = {extras = ["d"], version = "*"}
+nbconvert = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"

@@ -12,14 +12,16 @@ def open_file(filepath):
         return infile.read()
 
 
-openai.api_key = open_file("openai_api_key.txt")
+openai.api_key = open_file("keys/openai_api_key.txt")
 
 
 def gpt3_completion(prompt):
     return None
 
 
-def fine_tune_model(prompt, dataset, model_engine="davinci", num_epochs=3, batch_size=4):
+def fine_tune_model(
+    prompt, dataset, model_engine="davinci", num_epochs=3, batch_size=4
+):
     headers = {
         "Content - Type": "application / json",
         "Authorization": f"Bearer {openai.api_key}",
