@@ -9,7 +9,7 @@ import pandas as pd  # for DataFrames to store article sections and embeddings
 import re  # for cutting <ref> links out of Wikipedia articles
 import tiktoken  # for counting tokens
 from datetime import datetime
-
+from tqdm.auto import tqdm  # this is our progress bar
 from starlette.responses import HTMLResponse
 
 # Import the Zenpy Class
@@ -22,7 +22,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pydantic import BaseModel
+import generate_ai_response
 
+openai.organization = "org-C15lzQ0mQYcGkjGrpiBPk2Hb"
+openai.api_key = "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"
+
+## DECLARE GLOBAL VARIABLES ##
+MAX_INPUT_TOKENS = 8191
+COMPLETIONS_MODEL = "text-davinci-003"
 
 class Payload(BaseModel):
     category: typing.Literal["IT", "HR"]
@@ -53,9 +60,7 @@ def hello_world():
 
 @app.post("/api/v1/generate-response")
 async def generate(payload: Payload):
-    print(payload)
-    return {"message": "Message Received!"}
-
+    await generate_ai_response.start(payload.query, payload.category, payload.company)
 
 if __name__ == '__main__':
     uvicorn.run(app, port=8080, host='127.0.0.1')
