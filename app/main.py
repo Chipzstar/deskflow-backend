@@ -166,7 +166,6 @@ async def generate(payload: Payload):
     # save_dataframe_to_csv(results, f"data/{get_date_string()}/", "zendesk_query_embedding.csv")
 
     record = results.iloc[0]
-    print(record)
     response = await generate_gpt_opt_response(payload.query, record, payload.category, payload.company)
     print(response)
     return {"message": response}
