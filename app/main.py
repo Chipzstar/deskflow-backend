@@ -31,6 +31,7 @@ openai.api_key = "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"
 MAX_INPUT_TOKENS = 8191
 COMPLETIONS_MODEL = "text-davinci-003"
 
+
 class Payload(BaseModel):
     category: typing.Literal["IT", "HR"]
     query: str
@@ -39,10 +40,7 @@ class Payload(BaseModel):
 
 app = FastAPI()
 
-origins = [
-    "http://localhost",
-    "http://localhost:4200",
-]
+origins = ["http://localhost", "http://localhost:4200", "https://deskflow-nine.vercel.app"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,6 +59,7 @@ def hello_world():
 @app.post("/api/v1/generate-response")
 async def generate(payload: Payload):
     await generate_ai_response.start(payload.query, payload.category, payload.company)
+
 
 if __name__ == '__main__':
     uvicorn.run(app, port=8080, host='127.0.0.1')
