@@ -142,4 +142,5 @@ def start(query: str, category: typing.Literal["IT", "HR"], company: str = "Omni
     save_dataframe_to_csv(results, f"data/{get_date_string()}/", "zendesk_query_embedding.csv")
 
     record = results.iloc[0]
-    generate_gpt_opt_response(record, category, company)
+    return generate_gpt_opt_response(record, category, company)
+

@@ -58,7 +58,8 @@ def hello_world():
 
 @app.post("/api/v1/generate-response")
 async def generate(payload: Payload):
-    await generate_ai_response.start(payload.query, payload.category, payload.company)
+    response: str = await generate_ai_response.start(payload.query, payload.category, payload.company)
+    return {"message": response}
 
 
 if __name__ == '__main__':
