@@ -21,6 +21,14 @@ import typing  # for type hints
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from pydantic import BaseModel
+
+
+class Payload(BaseModel):
+    category: typing.Literal["IT", "HR"]
+    query: str
+    company: str = ("Omnicentra",)
+
 
 app = FastAPI()
 
@@ -44,8 +52,9 @@ def hello_world():
 
 
 @app.post("/api/v1/generate-response")
-def generate(query: str, category: typing.Literal["IT", "HR"], company="Omnicentra"):
-    return {"query": query, "category": category, "company": company}
+async def generate(payload: Payload):
+    print(payload)
+    return {"message": "Message Received!"}
 
 
 if __name__ == '__main__':
