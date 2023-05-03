@@ -149,13 +149,15 @@ Please feel free to answer any {category} related questions, and do your best to
 
 @app.get("/")
 def hello_world():
+    print(os.getcwd())
+    print(os.path.exists(f"{os.getcwd()}/app/data"))
     return {"message": "Hello World!"}
 
 
 @app.post("/api/v1/generate-response")
 async def generate(payload: Payload):
     print(payload)
-    DF = get_dataframe_from_csv("data", "zendesk_vector_embeddings.csv")
+    DF = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
     strings, relatednesses, embedding = await strings_ranked_by_relatedness(payload.query, DF, top_n=1)
     for string, relatedness in zip(strings, relatednesses):
         ANSWERS.append(string)
