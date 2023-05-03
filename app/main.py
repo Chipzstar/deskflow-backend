@@ -149,9 +149,12 @@ Please feel free to answer any {category} related questions, and do your best to
 
 @app.get("/")
 def hello_world():
-    print(os.getcwd())
-    print(os.path.exists(f"{os.getcwd()}/app/data"))
     return {"message": "Hello World!"}
+
+
+@app.get("/cwd")
+def get_cwd():
+    return {"cwd": os.getcwd()}
 
 
 @app.post("/api/v1/generate-response")
