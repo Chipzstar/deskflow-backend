@@ -25,8 +25,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pydantic import BaseModel
 
-openai.organization = "org-C15lzQ0mQYcGkjGrpiBPk2Hb"
-openai.api_key = "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"
+openai.organization = os.environ["OPENAI_ORG_ID"]
+openai.api_key = os.environ["OPENAI_API_KEY"]
 
 # DECLARE GLOBAL VARIABLES #
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
