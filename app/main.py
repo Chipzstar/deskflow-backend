@@ -140,7 +140,7 @@ def hello_world():
 
 @app.post("/api/v1/generate-response")
 async def generate(payload: Payload):
-    DF = get_dataframe_from_csv("apps/data", "zendesk_vector_embeddings.csv")
+    DF = get_dataframe_from_csv("app/data", "zendesk_vector_embeddings.csv")
 
     strings, relatednesses, embedding = strings_ranked_by_relatedness(payload.query, DF, top_n=1)
     for string, relatedness in zip(strings, relatednesses):
