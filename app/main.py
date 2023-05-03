@@ -128,9 +128,8 @@ As an experienced assistant, you can create Zendesk tickets and forward complex 
 
 If a question is outside your scope, you will make a note of it and store it as a "knowledge gap" to learn and improve. It is important to address employees in a friendly and compassionate tone, speaking to them in first person terms.
 
-Please feel free to answer any {category} related questions, and do your best to assist employees with questions promptly and professionally. You do not need to include the question in your response."""
+Please feel free to answer any {category} related questions, and do your best to assist employees with questions promptly and professionally. Do not include the question in your response."""
 
-    # pprint(prompt)
     response = (
         openai.Completion.create(
             prompt=prompt,
@@ -164,7 +163,6 @@ async def generate(payload: Payload):
         EMBEDDINGS.append(embedding)
 
     results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
-    print(results.head())
     # save_dataframe_to_csv(results, f"data/{get_date_string()}/", "zendesk_query_embedding.csv")
 
     record = results.iloc[0]
