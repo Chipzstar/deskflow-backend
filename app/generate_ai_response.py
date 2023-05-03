@@ -143,4 +143,3 @@ def start(query: str, category: typing.Literal["IT", "HR"], company: str = "Omni
 
     record = results.iloc[0]
     return generate_gpt_opt_response(record, category, company)
-
