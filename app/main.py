@@ -206,6 +206,7 @@ async def generate_gpt_chat_response(
     ]
     response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
     sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
+    messages.append({"role": "assistant", "content": sanitized_response})
     return sanitized_response, messages
 
 
@@ -221,6 +222,7 @@ async def continue_chat_response(
     messages.append(message.to_dict())
     response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
     sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
+    messages.append({"role": "assistant", "content": sanitized_response})
     return sanitized_response, messages
 
 
