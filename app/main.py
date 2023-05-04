@@ -12,12 +12,6 @@ from datetime import datetime
 
 from numpy import float64
 from tqdm.auto import tqdm  # this is our progress bar
-from starlette.responses import HTMLResponse
-
-# Import the Zenpy Class
-from zenpy import Zenpy
-from zenpy.lib.api_objects import Ticket
-from pprint import pprint
 from scipy import spatial  # for calculating vector similarities for search
 import typing  # for type hints
 from typing import List, Literal, Optional, Tuple, Union
@@ -40,7 +34,16 @@ ANSWERS = []
 EMBEDDINGS = []
 
 
-class Message(BaseModel):
+class Message:
+    def __init__(self, role: Literal["user", "system", "assistant"], content: str):
+        self.role = role
+        self.content = content
+
+    def __repr__(self):
+        return {"role": self.role, "content": self.content}
+
+
+class MessagePayload(BaseModel):
     role: Literal["user", "system", "assistant"]
     message: str
 
@@ -53,13 +56,14 @@ class Payload(BaseModel):
 
 class ChatPayload(BaseModel):
     query: str
-    history: list[Message]
-    company: str = "Omnicentra"
+    category: Literal["IT", "HR"]
+    history: Optional[list[MessagePayload]] = []
+    company: Optional[str] = "Omnicentra"
 
 
 app = FastAPI()
 
-origins = ["http://localhost", "http://localhost:4200", "https://deskflow-nine.vercel.app"]
+origins = ["*", "http://localhost", "http://localhost:4200", "https://deskflow-nine.vercel.app"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -188,27 +192,34 @@ Please feel free to answer any {category} related questions, and do your best to
     return message + question
 
 
-def generate_gpt_chat_response(
+async def generate_gpt_chat_response(
     question: str,
     record: pd.Series,
     category: typing.Literal["IT", "HR"],
     company: str = "Omnicentra",
     system_message: str = f"You are a helpful assistant that answers questions at Omnicentra",
 ):
-    message = query_message(record.question, category, company, record.top_answer, MAX_INPUT_TOKENS)
+    message = query_message(question, category, company, record.top_answer, MAX_INPUT_TOKENS)
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": message},
     ]
-    response = (
-        openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)['choices'][0][
-            'message'
-        ]['content']
-        .strip(" \n")
-        .strip(" Answer:")
-        .strip(" \n")
-    )
-    return response
+    response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
+    sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
+    return sanitized_response, messages
+
+
+async def continue_chat_response(
+    question: str,
+    messages: list[Message],
+    system_message: str = f"You are a helpful assistant that answers questions at Omnicentra",
+):
+    message = Message(role="user", content=question)
+    print(message)
+    messages.append(message)
+    response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
+    sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
+    return sanitized_response, messages
 
 
 @app.get("/")
@@ -221,38 +232,45 @@ def get_cwd():
     return {"cwd": os.getcwd()}
 
 
-@app.post("/api/v1/generate-response")
-async def generate(payload: Payload):
-    print(payload)
-    DF = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
-    strings, relatednesses, embedding = await strings_ranked_by_relatedness(payload.query, DF, top_n=1)
-    for string, relatedness in zip(strings, relatednesses):
-        ANSWERS.append(string)
-        SCORES.append("%.3f" % relatedness)
-        EMBEDDINGS.append(embedding)
-
-    results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
-    record = results.iloc[0]
-    response = await generate_gpt_opt_response(payload.query, record, payload.category, payload.company)
-    print(response)
-    return {"message": response}
+# @app.post("/api/v1/generate-response")
+# async def generate(payload: Payload):
+#     print(payload)
+#     DF = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
+#     strings, relatednesses, embedding = await strings_ranked_by_relatedness(payload.query, DF, top_n=1)
+#     for string, relatedness in zip(strings, relatednesses):
+#         ANSWERS.append(string)
+#         SCORES.append("%.3f" % relatedness)
+#         EMBEDDINGS.append(embedding)
+#
+#     results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
+#     record = results.iloc[0]
+#     response = await generate_gpt_opt_response(payload.query, record, payload.category, payload.company)
+#     print(response)
+#     return {"reply": response}
 
 
 @app.post("/api/v1/generate-chat-response")
 async def chat(payload: ChatPayload):
     print(payload)
+    # download knowledge base embeddings from csv
     DF = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
+    # create query embedding and fetch relatedness between query and knowledge base embeddings
     strings, relatednesses, embedding = await strings_ranked_by_relatedness(payload.query, DF, top_n=1)
     for string, relatedness in zip(strings, relatednesses):
         ANSWERS.append(string)
         SCORES.append("%.3f" % relatedness)
         EMBEDDINGS.append(embedding)
 
+    # Store answers and relatedness in dataframe
     results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
     record = results.iloc[0]
-    response = await generate_gpt_chat_response(payload.query, record, payload.category, payload.company)
+    # check if the query is the first question asked Alfred
+    if len(payload.history):
+        response, messages = await continue_chat_response(payload.query, payload.history)
+    else:
+        response, messages = await generate_gpt_chat_response(payload.query, record, payload.category, payload.company)
     print(response)
-    return {"message": response}
+    return {"reply": response, "messages": messages}
 
 
 if __name__ == '__main__':

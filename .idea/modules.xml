@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/GPTFineTuneDemo.iml" filepath="$PROJECT_DIR$/.idea/GPTFineTuneDemo.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../openai-cookbook/.idea/openai-cookbook.iml" filepath="$PROJECT_DIR$/../openai-cookbook/.idea/openai-cookbook.iml" />
     </modules>
   </component>
 </project>

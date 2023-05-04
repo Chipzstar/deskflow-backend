@@ -4,6 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [scripts]
+start = "uvicorn app.main:app --port=8080 --reload"
 reqs = "pipenv requirements > requirements.txt"
 
 [packages]
