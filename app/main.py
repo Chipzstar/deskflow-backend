@@ -188,7 +188,7 @@ Please feel free to answer any HR/IT related questions, and do your best to assi
 
 def query_message(query: str, context: str, company: str, token_budget: int) -> str:
     """Return a message for GPT, with relevant source texts pulled from a dataframe."""
-    introduction = f"""You are an AI-powered assistant designed to help employees with HR and IT questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
+    introduction = f"""Your name is Alfred. You are an AI-powered assistant designed to help employees with HR and IT questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
 
 As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person.
 
