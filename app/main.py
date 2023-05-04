@@ -168,7 +168,7 @@ Please feel free to answer any HR/IT related questions, and do your best to assi
     return response
 
 
-def query_message(query: str, category: str, company: str, content: str, token_budget: int) -> str:
+def query_message(query: str, company: str, content: str, token_budget: int) -> str:
     """Return a message for GPT, with relevant source texts pulled from a dataframe."""
     introduction = f"""You are an AI-powered assistant designed to help employees with IT/HR questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
 
