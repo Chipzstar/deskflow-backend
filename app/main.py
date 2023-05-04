@@ -20,6 +20,7 @@ from zenpy.lib.api_objects import Ticket
 from pprint import pprint
 from scipy import spatial  # for calculating vector similarities for search
 import typing  # for type hints
+from typing import List, Literal, Optional, Tuple, Union
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -32,16 +33,28 @@ openai.api_key = os.environ["OPENAI_API_KEY"]
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
 MAX_INPUT_TOKENS = 8191
 COMPLETIONS_MODEL = "text-davinci-003"
+CHAT_COMPLETIONS_MODEL = "gpt-3.5-turbo"
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
 SCORES = []
 ANSWERS = []
 EMBEDDINGS = []
 
 
+class Message(BaseModel):
+    role: Literal["user", "system", "assistant"]
+    message: str
+
+
 class Payload(BaseModel):
-    category: typing.Literal["IT", "HR"]
+    category: Literal["IT", "HR"]
     query: str
-    company: str = ("Omnicentra",)
+    company: str = "Omnicentra"
+
+
+class ChatPayload(BaseModel):
+    query: str
+    history: list[Message]
+    company: str = "Omnicentra"
 
 
 app = FastAPI()
@@ -55,6 +68,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = tiktoken.get_encoding(encoding_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
 
 
 def get_date_string():
@@ -104,7 +124,7 @@ async def strings_ranked_by_relatedness(
     return strings[:top_n], relatednesses[:top_n], query_embedding
 
 
-# # 7. Use GPT3 model to generate user-friendly answers to the query
+# 7. Use Text ADA Embedding model to generate user-friendly answers to the query
 async def generate_gpt_opt_response(
     question: str,
     record: pd.Series,
@@ -147,6 +167,50 @@ Please feel free to answer any {category} related questions, and do your best to
     return response
 
 
+def query_message(query: str, category: str, company: str, content: str, token_budget: int) -> str:
+    """Return a message for GPT, with relevant source texts pulled from a dataframe."""
+    introduction = f"""You are an AI-powered assistant designed to help employees with {category} questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
+
+As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person. If you are unable to provide an answer, you will respond by saying "I don't know, would you like me to create a ticket on Zendesk or ask {category}?" and follow the steps accordingly based on their response.
+
+If a question is outside your scope, you will make a note of it and store it as a "knowledge gap" to learn and improve. It is important to address employees in a friendly and compassionate tone, speaking to them in first person terms.
+
+Please feel free to answer any {category} related questions, and do your best to assist employees with questions promptly and professionally."""
+    question = f"\n\nQuestion: {query}"
+    message = introduction
+    context = f'\n\nContext:\n"""\n{content}\n"""'
+    num_tokens = num_tokens_from_text(message + context + question)
+    if num_tokens > token_budget:
+        print(f"Question too long: {num_tokens} tokens")
+    else:
+        message += context
+
+    return message + question
+
+
+def generate_gpt_chat_response(
+    question: str,
+    record: pd.Series,
+    category: typing.Literal["IT", "HR"],
+    company: str = "Omnicentra",
+    system_message: str = f"You are a helpful assistant that answers questions at Omnicentra",
+):
+    message = query_message(record.question, category, company, record.top_answer, MAX_INPUT_TOKENS)
+    messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": message},
+    ]
+    response = (
+        openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)['choices'][0][
+            'message'
+        ]['content']
+        .strip(" \n")
+        .strip(" Answer:")
+        .strip(" \n")
+    )
+    return response
+
+
 @app.get("/")
 def hello_world():
     return {"message": "Hello World!"}
@@ -168,10 +232,25 @@ async def generate(payload: Payload):
         EMBEDDINGS.append(embedding)
 
     results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
-    # save_dataframe_to_csv(results, f"data/{get_date_string()}/", "zendesk_query_embedding.csv")
-
     record = results.iloc[0]
     response = await generate_gpt_opt_response(payload.query, record, payload.category, payload.company)
+    print(response)
+    return {"message": response}
+
+
+@app.post("/api/v1/generate-chat-response")
+async def chat(payload: ChatPayload):
+    print(payload)
+    DF = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
+    strings, relatednesses, embedding = await strings_ranked_by_relatedness(payload.query, DF, top_n=1)
+    for string, relatedness in zip(strings, relatednesses):
+        ANSWERS.append(string)
+        SCORES.append("%.3f" % relatedness)
+        EMBEDDINGS.append(embedding)
+
+    results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
+    record = results.iloc[0]
+    response = await generate_gpt_chat_response(payload.query, record, payload.category, payload.company)
     print(response)
     return {"message": response}
 
