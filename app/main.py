@@ -14,7 +14,7 @@ from numpy import float64
 from tqdm.auto import tqdm  # this is our progress bar
 from scipy import spatial  # for calculating vector similarities for search
 import typing  # for type hints
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Dict, Literal, Optional, Tuple, Union
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -39,13 +39,13 @@ class Message:
         self.role = role
         self.content = content
 
-    def __repr__(self):
+    def to_dict(self):
         return {"role": self.role, "content": self.content}
 
 
 class MessagePayload(BaseModel):
     role: Literal["user", "system", "assistant"]
-    message: str
+    content: str
 
 
 class Payload(BaseModel):
@@ -57,7 +57,7 @@ class Payload(BaseModel):
 class ChatPayload(BaseModel):
     query: str
     category: Literal["IT", "HR"]
-    history: Optional[list[MessagePayload]] = []
+    history: Optional[List[Dict[str, str]]] = []
     company: Optional[str] = "Omnicentra"
 
 
@@ -211,12 +211,14 @@ async def generate_gpt_chat_response(
 
 async def continue_chat_response(
     question: str,
-    messages: list[Message],
+    messages: List[Dict[str, str]],
     system_message: str = f"You are a helpful assistant that answers questions at Omnicentra",
 ):
     message = Message(role="user", content=question)
-    print(message)
-    messages.append(message)
+    print("*" * 100)
+    print(message.to_dict())
+    print("*" * 100)
+    messages.append(message.to_dict())
     response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
     sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
     return sanitized_response, messages
@@ -264,7 +266,7 @@ async def chat(payload: ChatPayload):
     # Store answers and relatedness in dataframe
     results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
     record = results.iloc[0]
-    print("-"*50)
+    print("-" * 50)
     print(record['top_answer'])
     # check if the query is the first question asked Alfred
     if len(payload.history):
