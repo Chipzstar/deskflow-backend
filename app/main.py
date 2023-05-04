@@ -49,14 +49,12 @@ class MessagePayload(BaseModel):
 
 
 class Payload(BaseModel):
-    category: Literal["IT", "HR"]
     query: str
     company: str = "Omnicentra"
 
 
 class ChatPayload(BaseModel):
     query: str
-    category: Literal["IT", "HR"]
     history: Optional[List[Dict[str, str]]] = []
     company: Optional[str] = "Omnicentra"
 
@@ -132,7 +130,6 @@ async def strings_ranked_by_relatedness(
 async def generate_gpt_opt_response(
     question: str,
     record: pd.Series,
-    category: typing.Literal["IT", "HR"],
     company: str = "Omnicentra",
     description: str = "an AI software company",
 ):
@@ -146,13 +143,13 @@ Context:
 Question:
 {question}
 
-You are an AI-powered assistant designed to help employees with {category} questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
+You are an AI-powered assistant designed to help employees with HR/IT questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
 
-As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person. If you are unable to provide an answer, you will respond by saying "I don't know, would you like me to create a ticket on Zendesk or ask {category}?" and follow the steps accordingly based on their response.
+As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person. If you are unable to provide an answer, you will respond by saying "I don't know, would you like me to create a ticket on Zendesk or ask HR or IT?" and follow the steps accordingly based on their response.
 
 If a question is outside your scope, you will make a note of it and store it as a "knowledge gap" to learn and improve. It is important to address employees in a friendly and compassionate tone, speaking to them in first person terms.
 
-Please feel free to answer any {category} related questions, and do your best to assist employees with questions promptly and professionally. Do not include the question in your response."""
+Please feel free to answer any HR/IT related questions, and do your best to assist employees with questions promptly and professionally. Do not include the question in your response."""
 
     response = (
         openai.Completion.create(
@@ -195,11 +192,10 @@ Please feel free to answer any IT/HR related questions, and do your best to assi
 async def generate_gpt_chat_response(
     question: str,
     record: pd.Series,
-    category: typing.Literal["IT", "HR"],
     company: str = "Omnicentra",
     system_message: str = f"Your name is Alfred. You are a helpful assistant that answers IT/HR questions at Omnicentra",
 ):
-    message = query_message(question, category, company, record.top_answer, MAX_INPUT_TOKENS)
+    message = query_message(question, company, record.top_answer, MAX_INPUT_TOKENS)
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": message},
@@ -273,7 +269,7 @@ async def chat(payload: ChatPayload):
     if len(payload.history):
         response, messages = await continue_chat_response(payload.query, payload.history)
     else:
-        response, messages = await generate_gpt_chat_response(payload.query, record, payload.category, payload.company)
+        response, messages = await generate_gpt_chat_response(payload.query, record, payload.company)
     print(response)
     return {"reply": response, "messages": messages}
 
