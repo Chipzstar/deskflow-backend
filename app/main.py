@@ -264,6 +264,8 @@ async def chat(payload: ChatPayload):
     # Store answers and relatedness in dataframe
     results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
     record = results.iloc[0]
+    print("-"*50)
+    print(record['top_answer'])
     # check if the query is the first question asked Alfred
     if len(payload.history):
         response, messages = await continue_chat_response(payload.query, payload.history)
