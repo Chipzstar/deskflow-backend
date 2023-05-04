@@ -173,13 +173,13 @@ Please feel free to answer any {category} related questions, and do your best to
 
 def query_message(query: str, category: str, company: str, content: str, token_budget: int) -> str:
     """Return a message for GPT, with relevant source texts pulled from a dataframe."""
-    introduction = f"""You are an AI-powered assistant designed to help employees with {category} questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
+    introduction = f"""You are an AI-powered assistant designed to help employees with IT/HR questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
 
-As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person. If you are unable to provide an answer, you will respond by saying "I don't know, would you like me to create a ticket on Zendesk or ask {category}?" and follow the steps accordingly based on their response.
+As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person. If you are unable to provide an answer, you will respond by saying "I don't know, would you like me to create a ticket on Zendesk or ask HR/IT?" and follow the steps accordingly based on their response.
 
 If a question is outside your scope, you will make a note of it and store it as a "knowledge gap" to learn and improve. It is important to address employees in a friendly and compassionate tone, speaking to them in first person terms.
 
-Please feel free to answer any {category} related questions, and do your best to assist employees with questions promptly and professionally."""
+Please feel free to answer any IT/HR related questions, and do your best to assist employees with questions promptly and professionally."""
     question = f"\n\nQuestion: {query}"
     message = introduction
     context = f'\n\nContext:\n"""\n{content}\n"""'
@@ -197,7 +197,7 @@ async def generate_gpt_chat_response(
     record: pd.Series,
     category: typing.Literal["IT", "HR"],
     company: str = "Omnicentra",
-    system_message: str = f"You are a helpful assistant that answers questions at Omnicentra",
+    system_message: str = f"Your name is Alfred. You are a helpful assistant that answers IT/HR questions at Omnicentra",
 ):
     message = query_message(question, category, company, record.top_answer, MAX_INPUT_TOKENS)
     messages = [
@@ -213,7 +213,6 @@ async def generate_gpt_chat_response(
 async def continue_chat_response(
     question: str,
     messages: List[Dict[str, str]],
-    system_message: str = f"You are a helpful assistant that answers questions at Omnicentra",
 ):
     message = Message(role="user", content=question)
     print("*" * 100)
