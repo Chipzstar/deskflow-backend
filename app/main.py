@@ -9,8 +9,7 @@ import pandas as pd  # for DataFrames to store article sections and embeddings
 import re  # for cutting <ref> links out of Wikipedia articles
 import tiktoken  # for counting tokens
 from datetime import datetime
-
-from numpy import float64
+from openai.embeddings_utils import cosine_similarity, get_embedding
 from tqdm.auto import tqdm  # this is our progress bar
 from scipy import spatial  # for calculating vector similarities for search
 import typing  # for type hints
@@ -29,9 +28,6 @@ MAX_INPUT_TOKENS = 8191
 COMPLETIONS_MODEL = "text-davinci-003"
 CHAT_COMPLETIONS_MODEL = "gpt-3.5-turbo"
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
-SCORES = []
-ANSWERS = []
-EMBEDDINGS = []
 
 
 class Message:
@@ -107,23 +103,46 @@ def convert_csv_embeddings_to_floats(embeddings: str) -> list[float]:
 
 
 # search function
-async def strings_ranked_by_relatedness(
-    query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: 1 - spatial.distance.cosine(x, y), top_n: int = 100
-) -> tuple[list[str], list[float]]:
+def strings_ranked_by_relatedness(
+    query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
+) -> tuple[list[str], list[float], list[np.ndarray]]:
     """Returns a list of strings and relatednesses, sorted from most related to least."""
-    query_embedding_response = openai.Embedding.create(
-        model=EMBEDDING_MODEL,
-        input=query,
-    )
-    query_embedding = query_embedding_response["data"][0]["embedding"]
+    question_vector = get_embedding(query, EMBEDDING_MODEL)
     strings_and_relatednesses = []
     for i, row in df.iterrows():
         knowledge_base_embedding = convert_csv_embeddings_to_floats(row["embedding"])
-        item = row["content"], relatedness_fn(np.array(query_embedding), knowledge_base_embedding)
+        item = (
+            row["content"],
+            relatedness_fn(np.array(question_vector), knowledge_base_embedding),
+            knowledge_base_embedding,
+        )
         strings_and_relatednesses.append(item)
     strings_and_relatednesses.sort(key=lambda x: x[1], reverse=True)
-    strings, relatednesses = zip(*strings_and_relatednesses)
-    return strings[:top_n], relatednesses[:top_n], query_embedding
+    strings, relatednesses, embedding = zip(*strings_and_relatednesses)
+    return strings[:top_n], relatednesses[:top_n], embedding[:top_n]
+
+
+async def get_similarities(query: str, df: pd.DataFrame) -> pd.DataFrame:
+    SCORES = []
+    ANSWERS = []
+    EMBEDDINGS = []
+    strings, relatednesses, embeddings = strings_ranked_by_relatedness(query, df, top_n=3)
+    for string, relatedness, embedding in zip(strings, relatednesses, embeddings):
+        ANSWERS.append(string)
+        SCORES.append("%.3f" % relatedness)
+        EMBEDDINGS.append(embedding)
+
+    results = pd.DataFrame({"answers": ANSWERS, "match_scores": SCORES, "embeddings": EMBEDDINGS})
+    return results
+
+
+def generate_context_array(results: pd.DataFrame) -> str:
+    context_array = []
+    for i, row in results.iterrows():
+        context_array.append(row.answers)
+
+    context = "\n".join(context_array)
+    return context
 
 
 # 7. Use Text ADA Embedding model to generate user-friendly answers to the query
@@ -131,7 +150,6 @@ async def generate_gpt_opt_response(
     question: str,
     record: pd.Series,
     company: str = "Omnicentra",
-    description: str = "an AI software company",
 ):
     context = record.top_answer
     prompt = f"""Name: Alfred
@@ -168,11 +186,11 @@ Please feel free to answer any HR/IT related questions, and do your best to assi
     return response
 
 
-def query_message(query: str, company: str, content: str, token_budget: int) -> str:
+def query_message(query: str, context: str, company: str, token_budget: int) -> str:
     """Return a message for GPT, with relevant source texts pulled from a dataframe."""
     introduction = f"""You are an AI-powered assistant designed to help employees with HR and IT questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
 
-As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person. 
+As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person.
 
 When a HR / IT related question is asked by the user, only use information provided in the context and never use general knowledge. If the question asked is not in the context given to you or the context does not answer the question properly, you will respond apologetically saying something along the lines of "this information is not provided within the company’s knowledge base, would you like me to create a ticket on Zendesk or ask HR/IT?" and follow the steps accordingly based on their response.
 
@@ -181,7 +199,7 @@ If a question is outside your scope, you will make a note of it and store it as 
 Please feel free to answer any HR or IT related questions."""
     question = f"\n\nQuestion: {query}"
     message = introduction
-    context = f'\n\nContext:\n"""\n{content}\n"""'
+    context = f'\n\nContext:\n"""\n{context}\n"""'
     num_tokens = num_tokens_from_text(message + context + question)
     if num_tokens > token_budget:
         print(f"Question too long: {num_tokens} tokens")
@@ -193,11 +211,11 @@ Please feel free to answer any HR or IT related questions."""
 
 async def generate_gpt_chat_response(
     question: str,
-    record: pd.Series,
+    context: str,
     company: str = "Omnicentra",
     system_message: str = f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at Omnicentra",
 ):
-    message = query_message(question, company, record.top_answer, MAX_INPUT_TOKENS)
+    message = query_message(question, context, company, MAX_INPUT_TOKENS)
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": message},
@@ -210,9 +228,10 @@ async def generate_gpt_chat_response(
 
 async def continue_chat_response(
     question: str,
+    context: str,
     messages: List[Dict[str, str]],
 ):
-    message = Message(role="user", content=question)
+    message = Message(role="user", content=f"{question}\n\nContext: {context}")
     print("*" * 100)
     print(message.to_dict())
     print("*" * 100)
@@ -254,24 +273,18 @@ def get_cwd():
 async def chat(payload: ChatPayload):
     print(payload)
     # download knowledge base embeddings from csv
-    DF = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
-    # create query embedding and fetch relatedness between query and knowledge base embeddings
-    strings, relatednesses, embedding = await strings_ranked_by_relatedness(payload.query, DF, top_n=1)
-    for string, relatedness in zip(strings, relatednesses):
-        ANSWERS.append(string)
-        SCORES.append("%.3f" % relatedness)
-        EMBEDDINGS.append(embedding)
-
-    # Store answers and relatedness in dataframe
-    results = pd.DataFrame({"top_answer": ANSWERS, "match_score": SCORES, "embeddings": EMBEDDINGS})
-    record = results.iloc[0]
+    knowledge_base = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
+    # create query embedding and fetch relatedness between query and knowledge base in dataframe
+    similarities = await get_similarities(payload.query, knowledge_base)
+    # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
+    context = generate_context_array(similarities)
+    print(context.split("\n"))
     print("-" * 50)
-    print(record['top_answer'])
-    # check if the query is the first question asked Alfred
+    # check if the query is the first question of the conversation
     if len(payload.history):
-        response, messages = await continue_chat_response(payload.query, payload.history)
+        response, messages = await continue_chat_response(payload.query, context, payload.history)
     else:
-        response, messages = await generate_gpt_chat_response(payload.query, record, payload.company)
+        response, messages = await generate_gpt_chat_response(payload.query, context, payload.company)
     print(response)
     return {"reply": response, "messages": messages}
 

@@ -26,6 +26,9 @@ fastapi = "*"
 uvicorn = "*"
 pylint = "*"
 httpie = "*"
+matplotlib = "*"
+plotly = "*"
+scikit-learn = "*"
 
 [dev-packages]
 
