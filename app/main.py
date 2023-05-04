@@ -176,7 +176,7 @@ As an experienced assistant, you can create Zendesk tickets and forward complex 
 
 If a question is outside your scope, you will make a note of it and store it as a "knowledge gap" to learn and improve. It is important to address employees in a friendly and compassionate tone, speaking to them in first person terms.
 
-Please feel free to answer any HR or IT related questions, and do your best to assist employees with questions promptly and professionally."""
+Please feel free to answer any HR or IT related questions."""
     question = f"\n\nQuestion: {query}"
     message = introduction
     context = f'\n\nContext:\n"""\n{content}\n"""'
