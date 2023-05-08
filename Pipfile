@@ -4,7 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [scripts]
-start = "uvicorn app.main:app --port=8080 --reload"
+slack = "uvicorn slack-app:api --reload --port 3000"
+slack-info = "uvicorn slack-app:api --reload --port 3000 --log-level info"
+slack-warning = "uvicorn slack-app:api --reload --port 3000 --log-level warning"
+start = "uvicorn app.main:api --port=8080 --reload"
+debug = "uvicorn app.main:api--port=8080 --reload --log-level=debug"
 reqs = "pipenv requirements > requirements.txt"
 
 [packages]
@@ -29,6 +33,8 @@ httpie = "*"
 matplotlib = "*"
 plotly = "*"
 scikit-learn = "*"
+slack-bolt = "*"
+slack = "*"
 
 [dev-packages]
 
