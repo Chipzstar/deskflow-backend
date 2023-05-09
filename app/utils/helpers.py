@@ -1,6 +1,12 @@
-import os
+import os, re
 from datetime import datetime
 import pandas as pd
+
+
+def remove_custom_delimiters(input_str, start_delim='<@', end_delim='>'):
+    pattern = re.escape(start_delim) + r'.*?' + re.escape(end_delim)
+    output_str = re.sub(pattern, '', input_str)
+    return output_str
 
 
 def get_date_string():

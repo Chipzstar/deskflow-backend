@@ -8,7 +8,7 @@ from slack_bolt.async_app import AsyncApp, AsyncSay
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 
 from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response
-from app.utils.helpers import get_dataframe_from_csv
+from app.utils.helpers import get_dataframe_from_csv, remove_custom_delimiters
 from app.utils.types import ChatPayload
 
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
@@ -37,27 +37,29 @@ async def log_request(logger: logging.Logger, body: dict, next: Callable):
 async def handle_app_mention(body: dict, say: AsyncSay, logger):
     # logger.info(body)
     logger.info(body["event"]["text"])
-
     print("app_mention event:")
     event = body["event"]
     print(event)
     thread_ts = event.get("thread_ts", None) or event["ts"]
     history = []
-    # Check if the message is a command
-    print(str(body["event"]["text"]).split(">")[1])
-
     # Reply to thread
     response = client.chat_postMessage(channel=body["event"]["channel"],
                                        thread_ts=body["event"]["event_ts"],
                                        text=f"Alfred is thinking :robot_face:")
 
-    # Extract message from mention tag and strip out all whitespaces
-    message = str(body["event"]["text"]).split(">")[1].strip()
+    # Extract raw message from the event
+    raw_message = str(body["event"]["text"])
+
+    # remove any mention tags from the message and sanitize it
+    message = remove_custom_delimiters(raw_message)
+    print(message)
 
     # download knowledge base embeddings from csv
     knowledge_base = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
+
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
     similarities = await get_similarities(message, knowledge_base)
+
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
     context = generate_context_array(similarities)
     print(context.split("\n"))
