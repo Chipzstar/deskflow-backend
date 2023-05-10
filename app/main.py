@@ -1,28 +1,21 @@
-import os
-from pprint import pprint
-from typing import Callable
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 import logging
-from app.utils.helpers import get_dataframe_from_csv, remove_custom_delimiters
+import os
+
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.utils.gpt import get_similarities, \
     generate_context_array, generate_gpt_chat_response, continue_chat_response
+from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
-from slack_bolt.async_app import AsyncApp, AsyncSay
-from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
-from slack_sdk import WebClient
-from fastapi import FastAPI, Request, APIRouter
-from .routers import slack
-
-SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
-SLACK_APP_TOKEN = os.environ['SLACK_APP_TOKEN']
-SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
-
-logging.basicConfig(level=logging.DEBUG)
+from .routers.slack import events,interactions
+logging.basicConfig(level=logging.INFO)
 
 api = FastAPI()
 
-api.include_router(slack.router, prefix="/slack", tags=["slack"])
+api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
+api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 
 origins = ["*", "http://localhost", "http://localhost:4200", "https://deskflow-nine.vercel.app"]
 

@@ -27,7 +27,7 @@ def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int
 
 
 def strings_ranked_by_relatedness(
-    query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
+        query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
 ) -> tuple[list[str], list[float], list[np.ndarray]]:
     """Returns a list of strings and relatednesses, sorted from most related to least."""
     question_vector = get_embedding(query, EMBEDDING_MODEL)
@@ -68,13 +68,13 @@ def generate_context_array(results: pd.DataFrame) -> str:
     return context
 
 
-def query_message(query: str, context: str, company: str, token_budget: int) -> str:
+def query_message(query: str, context: str, company: str, token_budget: int, sender_name: str = "Ola") -> str:
     """Return a message for GPT, with relevant source texts pulled from a dataframe."""
     introduction = f"""Your name is Alfred. You are an AI-powered assistant designed to help employees with HR and IT questions at {company}. You have been programmed to provide fast and accurate solutions to their inquiries. As an AI, you do not have a gender, age, sexual orientation or human race.
 
 As an experienced assistant, you can create Zendesk tickets and forward complex inquiries to the appropriate person.
 
-When a HR / IT related question is asked by the user, only use information provided in the context and never use general knowledge. If the question asked is not in the context given to you or the context does not answer the question properly, you will respond apologetically saying something along the lines of "this information is not provided within the company’s knowledge base, would you like me to create a ticket on Zendesk or ask HR/IT?" and follow the steps accordingly based on their response.
+The conversation is between you and {sender_name} and you should first greet them with a phrase like "Hello {sender_name}". When a HR / IT related question is asked by {sender_name}, only use information provided in the context and never use general knowledge. If the question asked is not in the context given to you or the context does not answer the question properly, you will respond apologetically saying something along the lines of "this information is not provided within the company’s knowledge base, would you like me to create a ticket on Zendesk or ask HR/IT?" and follow the steps accordingly based on their response.
 
 If a question is outside your scope, you will make a note of it and store it as a "knowledge gap" to learn and improve. It is important to address employees in a friendly and compassionate tone, speaking to them in first person terms.
 
@@ -92,12 +92,14 @@ Please feel free to answer any HR or IT related questions."""
 
 
 async def generate_gpt_chat_response(
-    question: str,
-    context: str,
-    company: str = "Omnicentra",
-    system_message: str = f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at Omnicentra",
+        question: str,
+        context: str,
+        sender_name: str = "Ola",
+        company: str = "Omnicentra",
+        system_message: str = f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at "
+                              f"Omnicentra",
 ):
-    message = query_message(question, context, company, MAX_INPUT_TOKENS)
+    message = query_message(question, context, company, MAX_INPUT_TOKENS, sender_name)
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": message},
@@ -109,9 +111,9 @@ async def generate_gpt_chat_response(
 
 
 async def continue_chat_response(
-    question: str,
-    context: str,
-    messages: List[Dict[str, str]],
+        question: str,
+        context: str,
+        messages: List[Dict[str, str]],
 ):
     message = Message(role="user", content=f"{question}\n\nContext: {context}")
     print("*" * 100)
