@@ -13,6 +13,8 @@ from app.utils.gpt import get_similarities, generate_context_array, continue_cha
 from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 
+from app.utils.slack import display_support_dialog
+
 router = APIRouter()
 
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
@@ -72,8 +74,7 @@ async def generate_reply(event, in_thread=True):
 
     # remove any mention tags from the message and sanitize it
     message = remove_custom_delimiters(raw_message).strip()
-    print(f"MESSAGE:\t {message}")
-
+    print(f"\nMESSAGE:\t {message}")
     # download knowledge base embeddings from csv
     knowledge_base = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
@@ -85,13 +86,12 @@ async def generate_reply(event, in_thread=True):
         reply, messages = await continue_chat_response(message, context, [])
     else:
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
-    print(f"REPLY: {reply}")
+    print(f"\nREPLY: {reply}")
 
     response = client.chat_update(channel=event["channel"],
                                   ts=to_replace['message']['ts'],
                                   text=reply
                                   )
-    pprint(response.data)
     return reply, response.data
 
 
@@ -121,6 +121,23 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
         take_action = await check_reply_requires_action(reply, [])
 
 
+@app.event({"type": "message", "subtype": "file_share"})
+async def handle_file_share(body, say: AsyncSay, logger):
+    event = body["event"]
+    pprint(event)
+    thread_ts = event.get("thread_ts", None)
+    # ERROR handling
+    # check if a file was uploaded in the event, and respond with an error
+    if "files" in event and len(event["files"]) > 0:
+        await say(
+            text="Sorry, I can't process that file. Please type out your question and I will try to answer it. 🙂",
+            thread_ts=event["event_ts"]
+        )
+    # if raw_message is empty, return an error message
+    elif not str(event["text"]):
+        await say(text="Sorry, I didn't get that. Please try again.", thread_ts=event["event_ts"])
+
+
 @app.event({"type": "message"})
 async def handle_message(body, say, logger):
     # Log message
@@ -135,49 +152,18 @@ async def handle_message(body, say, logger):
         # OR to contact someone from HR/IT
         take_action = await check_reply_requires_action(reply, [])
         if take_action:
-            print("TAKING ACTION!!!!")
-            # Define the interactive message
-            # Create an interactivity pointer for the "Create ticket" button
-            create_ticket_pointer = {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": "Create ticket"
-                },
-                "action_id": "create_ticket"
-            }
-
-            # Create an interactivity pointer for the "Cancel" button
-            cancel_pointer = {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": "Contact HR/IT Support"
-                },
-                "action_id": "contact_support"
-            }
-            # Create a message block containing the header and buttons
-            header = SectionBlock(
-                text="Create Zendesk Support Ticket"
-            )
-            buttons = ActionsBlock(
-                elements=[create_ticket_pointer, cancel_pointer]
-            )
-            divider = DividerBlock()
-            block = [divider, buttons]
-            # Post a message to a user using the interactivity pointer
-            try:
-                response = client.chat_postMessage(channel=response['channel'], text="New message", blocks=block)
-                print(response)
-            except SlackApiError as e:
-                print("Error posting message: {}".format(e))
+            await display_support_dialog(client, response)
 
     # if the message was made inside a thread (excluding inside the Alfred messaging chat)
     elif thread_ts:
         print("handle_message_in_thread event:")
         # extract message from event
-        response, messages = await generate_reply(event)
-        # await say(text=f"{response}", thread_ts=thread_ts)
+        reply, response = await generate_reply(event)
+        # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
+        # OR to contact someone from HR/IT
+        take_action = await check_reply_requires_action(reply, [])
+        if take_action:
+            await display_support_dialog(client, response)
     else:
         return
 

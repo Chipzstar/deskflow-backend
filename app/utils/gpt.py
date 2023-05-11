@@ -1,15 +1,16 @@
-from typing import List, Dict
-import os
+from typing import List, Dict, TypedDict, NamedTuple
+import os, requests, json
 import numpy as np
 import openai
 import pandas as pd
 import tiktoken
 from openai.embeddings_utils import cosine_similarity, get_embedding
-from app.utils.helpers import convert_csv_embeddings_to_floats
+from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object
 from app.utils.types import Message
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 openai.organization = os.environ["OPENAI_ORG_ID"]
+zendesk_api_key = os.environ["ZENDESK_API_KEY"]
 
 # DECLARE GLOBAL VARIABLES #
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
@@ -17,6 +18,12 @@ MAX_INPUT_TOKENS = 8191
 COMPLETIONS_MODEL = "text-davinci-003"
 CHAT_COMPLETIONS_MODEL = "gpt-3.5-turbo"
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
+
+
+class Credentials(NamedTuple):
+    email: str
+    token: str
+    subdomain: str
 
 
 def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int:
@@ -124,3 +131,61 @@ async def continue_chat_response(
     sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
     messages.append({"role": "assistant", "content": sanitized_response})
     return sanitized_response, messages
+
+
+async def send_zendesk_ticket(query: str, system_message: str = "You are a Zendesk support ticket creator"):
+    message = f"""You are an AI assistant that converts customer queries into Zendesk support tickets. 
+
+            For every query, you should understand what the query is about and format the query into the 
+            following JSON Zendesk ticket payload: `{{ "ticket": {{ "comment": {{"body": "<BODY>"}}, "priority": "<PRIORITY>", "subject": 
+            "<SUBJECT>" }} }}`
+
+            <PRIORITY> = the priority of the ticket (can be one of: low, normal, high, urgent)
+            <SUBJECT> = the subject of the ticket
+            <BODY> = the full description of the query
+            
+            Refer to the documentation for more information about how the ticket payload is formatted : https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#create-ticket
+            
+            QUERY: {query}
+            """
+    messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": message},
+    ]
+
+    response = (
+        openai.ChatCompletion.create(
+            messages=messages,
+            temperature=0,
+            model=CHAT_COMPLETIONS_MODEL,
+        )
+    )
+    data: Dict = json.loads(response['choices'][0]['message']['content'].replace("`", "").strip())
+    is_valid = validate_ticket_object(data)
+    if not is_valid:
+        print(f"Failed to create ticket using the payload: {data}")
+        print(data)
+        return None
+
+    creds = Credentials(
+        email="chisom@exam-genius.com",
+        token=zendesk_api_key,
+        subdomain="omnicentra",
+    )
+    # Set up the authentication credentials
+    auth = (creds.email + "/token", creds.token)
+    url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
+    response = requests.post(
+        url,
+        json=data,
+        auth=auth
+    )
+
+    # Check the response status code
+    if response.status_code == 201:
+        print("Ticket created successfully")
+        print(response)
+    else:
+        print(f"Failed to create ticket: {response.text}")
+
+    return response
