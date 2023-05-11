@@ -1,3 +1,4 @@
+from pprint import pprint
 from typing import List, Dict, TypedDict, NamedTuple
 import os, requests, json
 import numpy as np
@@ -168,9 +169,9 @@ async def send_zendesk_ticket(query: str, system_message: str = "You are a Zende
         return None
 
     creds = Credentials(
-        email="chisom@exam-genius.com",
+        email="chisom.oguibe@googlemail.com",
         token=zendesk_api_key,
-        subdomain="omnicentra",
+        subdomain="secondstechnologies",
     )
     # Set up the authentication credentials
     auth = (creds.email + "/token", creds.token)
@@ -184,8 +185,10 @@ async def send_zendesk_ticket(query: str, system_message: str = "You are a Zende
     # Check the response status code
     if response.status_code == 201:
         print("Ticket created successfully")
-        print(response)
+        pprint(response.json())
+        return response.json()['ticket']
     else:
         print(f"Failed to create ticket: {response.text}")
+        return response.text
 
-    return response
+

@@ -118,10 +118,14 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
             text="Ok, hold on while I create your Zendesk support ticket for you",
         )
         # Create a Zendesk support ticket using the data from the action payload
-        await send_zendesk_ticket(last_message)
+        ticket = await send_zendesk_ticket(last_message)
         await respond(
-            replace_original=False,
-            text=":white_check_mark: Done!",
+            replace_original=True,
+            text=f":white_check_mark: Your support ticket has been created successfully. "
+                 f"\nTicket ID: #{ticket['id']}"
+                 f"\nSubject: {ticket['subject']}"
+                 f"\nDescription: {ticket['description']}"
+                 f"\nCreated at: {ticket['created_at']}"
         )
 
 
