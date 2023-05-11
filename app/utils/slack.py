@@ -5,6 +5,38 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.models.blocks import SectionBlock, ActionsBlock, DividerBlock
 
 
+async def display_plain_text_dialog(
+        question: str,
+        sender_id: str,
+        recipient_name: str,
+        client: WebClient,
+        response
+):
+    pprint(response)
+    blocks = [
+        {
+            "type": "input",
+            "dispatch_action": True,
+            "block_id": sender_id,
+            "element": {
+                "type": "plain_text_input",
+                "action_id": "reply_support"
+            },
+            "label": {
+                "type": "plain_text",
+                "text": question,
+                "emoji": True
+            },
+        }
+    ]
+    # Post a message to a user using the interactivity pointer
+    try:
+        response = client.chat_postMessage(channel=response['channel'], text=question, blocks=blocks)
+        print(response)
+    except SlackApiError as e:
+        print("Error posting message: {}".format(e))
+
+
 async def display_support_dialog(client: WebClient, response):
     print("TAKING ACTION!!!!")
     # Define the interactive message
@@ -49,7 +81,8 @@ async def display_support_dialog(client: WebClient, response):
 def get_user(user_id: str, client: WebClient):
     try:
         response = client.users_info(user=user_id)
-        pprint(response)
-        return response.data
+        profile = response.data["user"]["profile"]
+        pprint(f"{user_id} <=> {profile['first_name']}")
+        return profile
     except SlackApiError as e:
         print("Error getting user: {}".format(e))
