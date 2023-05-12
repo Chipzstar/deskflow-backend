@@ -78,7 +78,7 @@ async def display_support_dialog(client: WebClient, response):
         print("Error posting message: {}".format(e))
 
 
-def get_user(user_id: str, client: WebClient):
+def get_user_from_id(user_id: str, client: WebClient):
     try:
         response = client.users_info(user=user_id)
         profile = response.data["user"]["profile"]
@@ -86,3 +86,21 @@ def get_user(user_id: str, client: WebClient):
         return profile
     except SlackApiError as e:
         print("Error getting user: {}".format(e))
+        raise Exception(f"Error fetching user information for user {user_id}: {e}")
+
+
+async def get_user_from_event(event, client: WebClient):
+    try:
+        # Extract the user ID from the message event
+        user_id = event["user"]
+        # Use the app.client method to fetch user information by ID
+        response = client.users_info(user=user_id)
+        pprint(f"USER INFO:\t {response.data['user']}")
+        # Extract the username from the API response
+        if response.data:
+            username = response.data["user"]["profile"]["first_name"]
+            pprint(f"{user_id} <=> {username}")
+            return username
+    except SlackApiError as e:
+        print("Error getting user: {}".format(e))
+        raise Exception(f"Error fetching user information: {e}")

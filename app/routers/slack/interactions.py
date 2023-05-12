@@ -1,3 +1,4 @@
+import logging
 import os
 from pprint import pprint
 from typing import Tuple
@@ -12,7 +13,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from app.utils.gpt import send_zendesk_ticket
-from app.utils.slack import get_user, display_plain_text_dialog
+from app.utils.slack import get_user_from_id, display_plain_text_dialog
 
 router = APIRouter()
 
@@ -48,8 +49,8 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
     pprint(body)
     channel_id = body["channel"]["id"]
     selected_user_id = body["actions"][0]["selected_user"]
-    recipient = get_user(selected_user_id, client)
-    print(f"Selected user: {recipient['real_name_normalized']}")
+    recipient = get_user_from_id(selected_user_id, client)
+    logging.log(logging.DEBUG, f"Selected user: {recipient['real_name_normalized']}")
     try:
         conversation = client.conversations_history(
             channel=channel_id,
@@ -63,7 +64,7 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
             print("app_id" in message)
             if "user" in message and "app_id" not in message:
                 last_message = message
-                user = get_user(last_message["user"], client)
+                user = get_user_from_id(last_message["user"], client)
                 response = client.chat_postMessage(
                     text=f"Hello {recipient['first_name']}, <@{last_message['user']}> wants to know:\n",
                     channel=selected_user_id
@@ -79,7 +80,7 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
                 break
         await respond(
             replace_original=True,
-            text=f":white_check_mark:  Your query has been sent to <@{selected_user_id}>! I will update you as soon "
+            text=f":white_check_mark:  Your query has been sent to <@{selected_user_id}>! \nI will update you as soon "
                  f"as I get a reply"
         )
     except SlackApiError as e:
@@ -92,7 +93,7 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
     pprint(body)
     user_id = body["actions"][0]["block_id"]
     sender = body["user"]["id"]
-    user_profile = get_user(user_id, client)
+    user_profile = get_user_from_id(user_id, client)
     client.chat_postMessage(channel=user_id, text=f"<@{sender}> says: {body['actions'][0]['value']}")
     await respond(
         replace_original=True,

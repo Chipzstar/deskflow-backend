@@ -2,18 +2,14 @@ import logging, os
 from pprint import pprint
 from typing import Callable, List, Dict
 
-from slack_bolt import Ack
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.async_app import AsyncSay
 from slack_sdk import WebClient
 from fastapi import APIRouter, Request
-from slack_sdk.errors import SlackApiError
-from slack_sdk.models.blocks import SectionBlock, ActionsBlock, DividerBlock
 from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response
 from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
-
-from app.utils.slack import display_support_dialog
+from app.utils.slack import display_support_dialog, get_user_from_event
 
 router = APIRouter()
 
@@ -25,23 +21,6 @@ SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
 app = AsyncApp(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
 app_handler = AsyncSlackRequestHandler(app)
 client = WebClient(SLACK_BOT_TOKEN)
-
-
-async def get_user_name(event):
-    # Extract the user ID from the message event
-    user_id = event["user"]
-
-    # Use the app.client method to fetch user information by ID
-    response = await app.client.users_info(user=user_id)
-    print(f"USER INFO:\t {response}")
-    # Extract the username from the API response
-    if response["ok"]:
-        username = response["user"]["profile"]["first_name"]
-        print(f"The user with ID {user_id} is named {username}.")
-        return username
-    else:
-        print(f"Error fetching user information for user {user_id}: {response['error']}")
-        raise Exception(f"Error fetching user information for user {user_id}: {response['error']}")
 
 
 async def check_reply_requires_action(reply: str, messages: List[Dict[str, str]]):
@@ -67,7 +46,7 @@ async def generate_reply(event, in_thread=True):
         to_replace = client.chat_postMessage(channel=event["channel"],
                                              text=f"Alfred is thinking :robot_face:")
 
-    sender_name = await get_user_name(event)
+    sender_name = await get_user_from_event(event, client)
 
     # Extract raw message from the event
     raw_message = str(event["text"])
@@ -95,6 +74,22 @@ async def generate_reply(event, in_thread=True):
     return reply, response.data
 
 
+async def check_bot_mentioned_in_thread(channel: str, thread_ts: str):
+    response = client.conversations_replies(channel=channel, ts=thread_ts, inclusive=True)
+    bot_info = client.auth_test(token=SLACK_BOT_TOKEN)
+    bot_user_id = bot_info["user_id"]
+    for message in response.data['messages']:
+        # Check if the message was authored by the Slack bot or contains a mention of the bot user ID
+        # check if any message contains the bot user id
+        if 'bot_id' in message and message['bot_id'] == bot_user_id:
+            return True
+        elif 'text' in message and f"<@{bot_user_id}>" in message['text']:
+            return True
+        elif 'user' in message and message["user"] == bot_user_id:
+            return True
+    return False
+
+
 @app.middleware
 async def log_request(logger: logging.Logger, body: dict, next: Callable):
     # print("*" * 100)
@@ -119,6 +114,8 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
         take_action = await check_reply_requires_action(reply, [])
+        if take_action:
+            await display_support_dialog(client, response)
 
 
 @app.event({"type": "message", "subtype": "file_share"})
@@ -144,7 +141,7 @@ async def handle_message(body, say, logger):
     event = body["event"]
     pprint(event)
     thread_ts = event.get("thread_ts", None)
-    # if message was a direct message to Alfred bot
+    # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
         reply, response = await generate_reply(event, bool(thread_ts))
@@ -154,16 +151,22 @@ async def handle_message(body, say, logger):
         if take_action:
             await display_support_dialog(client, response)
 
+    # USE CASE 2: Message was sent inside a thread where the initial message tagged Alfred
     # if the message was made inside a thread (excluding inside the Alfred messaging chat)
     elif thread_ts:
         print("handle_message_in_thread event:")
-        # extract message from event
-        reply, response = await generate_reply(event)
-        # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
-        # OR to contact someone from HR/IT
-        take_action = await check_reply_requires_action(reply, [])
-        if take_action:
-            await display_support_dialog(client, response)
+        # check for any messages in thread history where Alfred was tagged
+        is_mentioned = await check_bot_mentioned_in_thread(event['channel'], thread_ts)
+        if is_mentioned:
+            # extract message from event
+            reply, response = await generate_reply(event)
+            # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on
+            # zendesk OR to contact someone from HR/IT
+            take_action = await check_reply_requires_action(reply, [])
+            if take_action:
+                await display_support_dialog(client, response)
+        else:
+            logger.info(f"No bot mention not found in thread: {thread_ts}")
     else:
         return
 

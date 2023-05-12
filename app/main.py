@@ -10,12 +10,14 @@ from app.utils.gpt import get_similarities, \
 from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
 from .routers.slack import events,interactions
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 api = FastAPI()
-
-api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
-api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 
 origins = ["*", "http://localhost", "http://localhost:4200", "https://deskflow-nine.vercel.app"]
 
@@ -26,6 +28,9 @@ api.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
+api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 
 
 @api.get("/")
