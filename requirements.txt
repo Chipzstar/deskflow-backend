@@ -18,6 +18,7 @@ certifi==2023.5.7 ; python_version >= '3.6'
 cffi==1.15.1
 charset-normalizer==3.1.0 ; python_full_version >= '3.7.0'
 click==8.1.3 ; python_version >= '3.7'
+colorama==0.4.6 ; sys_platform == 'win32'
 comm==0.1.3 ; python_version >= '3.6'
 contourpy==1.0.7 ; python_version >= '3.8'
 cycler==0.11.0 ; python_version >= '3.6'
@@ -29,7 +30,7 @@ dnspython==2.3.0 ; python_version >= '3.7' and python_version < '4.0'
 executing==1.2.0
 fastapi==0.95.1
 fastjsonschema==2.16.3
-fonttools==4.39.3 ; python_version >= '3.8'
+fonttools==4.39.4 ; python_version >= '3.8'
 fqdn==1.5.1
 frozenlist==1.3.3 ; python_version >= '3.7'
 h11==0.14.0 ; python_version >= '3.7'
@@ -84,17 +85,15 @@ pandas==2.0.1
 pandocfilters==1.5.0 ; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 parso==0.8.3 ; python_version >= '3.6'
 pathspec==0.11.1 ; python_version >= '3.7'
-pexpect==4.8.0 ; sys_platform != 'win32'
 pickleshare==0.7.5
 pillow==9.5.0 ; python_version >= '3.7'
 pinecone-client==2.2.1
 pip==23.1.2 ; python_version >= '3.7'
-platformdirs==3.5.0 ; python_version >= '3.7'
+platformdirs==3.5.1 ; python_version >= '3.7'
 plotly==5.14.1
 prometheus-client==0.16.0 ; python_version >= '3.6'
 prompt-toolkit==3.0.38 ; python_full_version >= '3.7.0'
 psutil==5.9.5 ; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
-ptyprocess==0.7.0 ; os_name != 'nt'
 pure-eval==0.2.2
 pycparser==2.21
 pydantic==1.10.7 ; python_version >= '3.7'
@@ -106,6 +105,8 @@ pysocks==1.7.1
 python-dateutil==2.8.2 ; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 python-json-logger==2.0.7 ; python_version >= '3.6'
 pytz==2023.3
+pywin32==306 ; sys_platform == 'win32' and platform_python_implementation != 'PyPy'
+pywinpty==2.0.10 ; os_name == 'nt'
 pyyaml==6.0 ; python_version >= '3.6'
 pyzmq==25.0.2 ; python_version >= '3.6'
 qtconsole==5.4.3 ; python_version >= '3.7'
@@ -150,6 +151,7 @@ webcolors==1.13
 webencodings==0.5.1
 websocket-client==1.5.1 ; python_version >= '3.7'
 widgetsnbextension==4.0.7 ; python_version >= '3.7'
+win32-setctime==1.1.0 ; sys_platform == 'win32'
 wrapt==1.15.0 ; python_version < '3.11'
 yarl==1.9.2 ; python_version >= '3.7'
 zenpy==2.0.25

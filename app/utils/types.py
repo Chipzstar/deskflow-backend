@@ -23,5 +23,6 @@ class Payload(BaseModel):
 
 class ChatPayload(BaseModel):
     query: str
+    name: str
     history: Optional[List[Dict[str, str]]] = []
     company: Optional[str] = "Omnicentra"

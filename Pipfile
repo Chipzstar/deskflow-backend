@@ -6,7 +6,10 @@ name = "pypi"
 [scripts]
 start = "uvicorn app.main:api --port=8080 --reload"
 debug = "uvicorn app.main:api--port=8080 --reload --log-level=debug"
-reqs = "pipenv requirements > requirements.txt"
+reqs = "cmd /C 'pipenv requirements > requirements.txt'"
+env-sync = "cmd /C 'doppler secrets download --no-file --format env > .env'"
+reqs-unix = "sh -c 'pipenv requirements > requirements.txt'"
+env-sync-unix = "sh -c 'doppler secrets download --no-file --format env > .env'"
 
 [packages]
 openai = "*"

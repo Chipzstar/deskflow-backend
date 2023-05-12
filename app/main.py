@@ -5,11 +5,10 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.utils.gpt import get_similarities, \
-    generate_context_array, generate_gpt_chat_response, continue_chat_response
+from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
 from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
-from .routers.slack import events,interactions
+from .routers.slack import events, interactions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,7 +57,7 @@ async def chat(payload: ChatPayload):
     if len(payload.history):
         response, messages = await continue_chat_response(payload.query, context, payload.history)
     else:
-        response, messages = await generate_gpt_chat_response(payload.query, context, payload.company)
+        response, messages = await generate_gpt_chat_response(payload.query, context, payload.name)
     print(response)
     return {"reply": response, "messages": messages}
 
