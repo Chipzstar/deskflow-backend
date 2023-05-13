@@ -10,6 +10,7 @@ from app.utils.gpt import get_similarities, generate_context_array, continue_cha
 from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from app.utils.slack import display_support_dialog, get_user_from_event
+from tabulate import tabulate
 
 router = APIRouter()
 
@@ -39,12 +40,11 @@ async def generate_reply(event, in_thread=True):
     # initially return a message that Alfred is thinking and store metadata for that message
     thread_ts = event["event_ts"] if event["event_ts"] else None
     if in_thread:
-        to_replace = client.chat_postMessage(channel=event["channel"],
-                                             thread_ts=event["event_ts"],
-                                             text=f"Alfred is thinking :robot_face:")
+        to_replace = client.chat_postMessage(
+            channel=event["channel"], thread_ts=event["event_ts"], text=f"Alfred is thinking :robot_face:"
+        )
     else:
-        to_replace = client.chat_postMessage(channel=event["channel"],
-                                             text=f"Alfred is thinking :robot_face:")
+        to_replace = client.chat_postMessage(channel=event["channel"], text=f"Alfred is thinking :robot_face:")
 
     sender_name = await get_user_from_event(event, client)
 
@@ -67,10 +67,7 @@ async def generate_reply(event, in_thread=True):
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
     print(f"\nREPLY: {reply}")
 
-    response = client.chat_update(channel=event["channel"],
-                                  ts=to_replace['message']['ts'],
-                                  text=reply
-                                  )
+    response = client.chat_update(channel=event["channel"], ts=to_replace['message']['ts'], text=reply)
     return reply, response.data
 
 
@@ -128,7 +125,7 @@ async def handle_file_share(body, say: AsyncSay, logger):
     if "files" in event and len(event["files"]) > 0:
         await say(
             text="Sorry, I can't process that file. Please type out your question and I will try to answer it. 🙂",
-            thread_ts=event["event_ts"]
+            thread_ts=event["event_ts"],
         )
     # if raw_message is empty, return an error message
     elif not str(event["text"]):
@@ -179,4 +176,8 @@ async def command(ack, body):
 
 @router.post("/events")
 async def endpoint(req: Request):
+    data = await req.json()
+    pprint(data)
+    if 'challenge' in data:
+        return {'challenge': data['challenge']}
     return await app_handler.handle(req)

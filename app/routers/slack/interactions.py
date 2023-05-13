@@ -4,7 +4,6 @@ from pprint import pprint
 from typing import Tuple
 
 from fastapi import APIRouter, Request
-from slack_bolt import Ack
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.context.ack.async_ack import AsyncAck
@@ -30,10 +29,7 @@ client = WebClient(SLACK_BOT_TOKEN)
 def validate_user(body: dict) -> Tuple[bool, str]:
     # fetch the user's ID'
     user_id = body["user"]["id"]
-    conversation = client.conversations_history(
-        channel=body["channel"]["id"],
-        limit=3
-    )
+    conversation = client.conversations_history(channel=body["channel"]["id"], limit=3)
     # pprint(conversation.data)
     # Retrieve the last message containing the original question asked to Alfred
     last_message = conversation.data['messages'][2]
@@ -52,10 +48,7 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
     recipient = get_user_from_id(selected_user_id, client)
     logging.log(logging.DEBUG, f"Selected user: {recipient['real_name_normalized']}")
     try:
-        conversation = client.conversations_history(
-            channel=channel_id,
-            limit=7
-        )
+        conversation = client.conversations_history(channel=channel_id, limit=7)
         # for message in conversation.data['messages']:
         #     print(f"{'-' * 50}\n{message['text'][0:50]}\n{'-' * 50}")
 
@@ -67,21 +60,17 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
                 user = get_user_from_id(last_message["user"], client)
                 response = client.chat_postMessage(
                     text=f"Hello {recipient['first_name']}, <@{last_message['user']}> wants to know:\n",
-                    channel=selected_user_id
+                    channel=selected_user_id,
                 )
                 await display_plain_text_dialog(
-                    last_message["text"],
-                    last_message['user'],
-                    recipient['first_name'],
-                    client,
-                    response.data
+                    last_message["text"], last_message['user'], recipient['first_name'], client, response.data
                 )
                 print(f"Sent message to {recipient['first_name']}")
                 break
         await respond(
             replace_original=True,
             text=f":white_check_mark:  Your query has been sent to <@{selected_user_id}>! \nI will update you as soon "
-                 f"as I get a reply"
+            f"as I get a reply",
         )
     except SlackApiError as e:
         print(f"Error sending message: {e}")
@@ -123,10 +112,10 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
         await respond(
             replace_original=True,
             text=f":white_check_mark: Your support ticket has been created successfully. "
-                 f"\nTicket ID: #{ticket['id']}"
-                 f"\nSubject: {ticket['subject']}"
-                 f"\nDescription: {ticket['description']}"
-                 f"\nCreated at: {ticket['created_at']}"
+            f"\nTicket ID: #{ticket['id']}"
+            f"\nSubject: {ticket['subject']}"
+            f"\nDescription: {ticket['description']}"
+            f"\nCreated at: {ticket['created_at']}",
         )
 
 
@@ -147,18 +136,12 @@ async def handle_contact_support(ack: AsyncAck, body: dict, respond: AsyncRespon
                 {
                     "type": "section",
                     "block_id": "section678",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "Select an employee from the dropdown list"
-                    },
+                    "text": {"type": "mrkdwn", "text": "Select an employee from the dropdown list"},
                     "accessory": {
                         "action_id": "user_select",
                         "type": "users_select",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Which employee would you like to contact?"
-                        }
-                    }
+                        "placeholder": {"type": "plain_text", "text": "Which employee would you like to contact?"},
+                    },
                 }
             ]
         )

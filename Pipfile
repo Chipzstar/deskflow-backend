@@ -35,6 +35,8 @@ plotly = "*"
 scikit-learn = "*"
 slack-bolt = "*"
 slack = "*"
+tabulate = "*"
+python-dotenv = "*"
 
 [dev-packages]
 
