@@ -95,24 +95,27 @@ def cache_conversation(
         history: List[Dict[str, str]]
 ):
     try:
+        app_id = client.auth_test()
         if channel_type == "CHANNEL_MENTION_REPLY" or channel_type == "DM_REPLY":
             root_message_id = get_conversation_id(
                 last_message["channel"],
                 last_message["message"]["thread_ts"],
                 client
             )
+            conversation_id = f"{app_id}:{root_message_id}"
             pprint(f"CONVERSATION ID: {root_message_id}")
             r = Redis()
             # Cache the message in Redis using the message ID as the key, TTL = 1 day
-            r.add_to_cache(root_message_id, json.dumps(history), ONE_DAY_IN_SECONDS)
+            r.add_to_cache(conversation_id, json.dumps(history), ONE_DAY_IN_SECONDS)
         else:
             for message in history:
                 print(message)
                 print("-" * 80)
-            pprint(f"CONVERSATION ID: {last_message['channel']}")
+            conversation_id = f"{app_id}:{last_message['channel']}"
+            pprint(f"CONVERSATION ID: {conversation_id}")
             r = Redis()
             # Cache the message in Redis using the message ID as the key, TTL = 1 hour
-            r.add_to_cache(last_message['channel'], json.dumps(history), ONE_HOUR_IN_SECONDS)
+            r.add_to_cache(conversation_id, json.dumps(history), ONE_HOUR_IN_SECONDS)
         return "Success"
     except ResponseError as e:
         print(f"Response Error: {e}")

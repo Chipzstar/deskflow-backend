@@ -12,8 +12,7 @@ from app.redis.client import Redis
 from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response
 from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, cache_conversation
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
-from app.utils.slack import display_support_dialog, get_user_from_event, get_conversation_id
-from tabulate import tabulate
+from app.utils.slack import display_support_dialog, get_user_from_event
 
 router = APIRouter()
 
@@ -51,9 +50,10 @@ async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
     else:
         to_replace = client.chat_postMessage(channel=event["channel"], text=f"Alfred is thinking :robot_face:")
 
+    app_id = client.auth_test()
     # check if the message was made inside a thread and not root of channel
     if thread_ts:
-        conversation_id = thread_ts
+        conversation_id = f"{app_id}:{thread_ts}"
         # check if the GPT conversation history is cached in memory
         r = Redis()
         byte_result = r.get_value(conversation_id)
@@ -62,9 +62,10 @@ async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
             history = json.loads(str_result)
     # check if the message was made inside alfred jnr chat message tab
     elif str(event["channel"]).startswith("D"):
-        # check if the GPT conversation history is cached in memory
+        conversation_id = f"{app_id}:{event['channel']}"
         r = Redis()
-        byte_result = r.get_value(event["channel"])
+        # check if the GPT conversation history is cached in memory
+        byte_result = r.get_value(conversation_id)
         if byte_result:
             str_result = str(byte_result, encoding='utf-8')
             history = json.loads(str_result)
