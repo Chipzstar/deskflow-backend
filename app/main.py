@@ -1,3 +1,5 @@
+# from dotenv import load_dotenv
+# load_dotenv()
 import logging
 import os
 
@@ -5,10 +7,11 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.redis.client import Redis
 from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
 from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
-from .routers.slack import events, interactions
+from app.routers.slack import events, interactions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,4 +66,4 @@ async def chat(payload: ChatPayload):
 
 
 if __name__ == '__main__':
-    uvicorn.run(api, port=8080, host='127.0.0.1')
+    uvicorn.run("__main__:api", port=8080, host='127.0.0.1', reload=True)

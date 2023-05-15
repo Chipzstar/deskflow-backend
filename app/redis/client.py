@@ -1,4 +1,3 @@
-from datetime import timedelta
 import os
 import redis
 
@@ -21,11 +20,13 @@ class Redis(object):
             socket_timeout=SOCKET_TIMEOUT
     ):
         # Set up Redis client
-        if USERNAME and PASSWORD:
-            pool = redis.ConnectionPool(host=host, port=port, db=db, username=username, password=password)
+        if USERNAME or PASSWORD:
+            redis_url = f"rediss://{username}:{password}@{host}:{port}"
+            pool = redis.ConnectionPool.from_url(redis_url)
+            self.__redis = redis.StrictRedis(connection_pool=pool, decode_responses=True, ssl=True)
         else:
-            pool = redis.ConnectionPool(host=host, port=port, db=0)
-        self.__redis = redis.Redis(connection_pool=pool)
+            pool = redis.ConnectionPool(host=host, port=port, db=db)
+            self.__redis = redis.Redis(connection_pool=pool)
 
     def add_to_cache(self, key, value, ttl):
         self.__redis.setex(key, ttl, value=value)
