@@ -50,10 +50,10 @@ async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
     else:
         to_replace = client.chat_postMessage(channel=event["channel"], text=f"Alfred is thinking :robot_face:")
 
-    app_id = client.auth_test()
+    bot_id = client.auth_test()['bot_id']
     # check if the message was made inside a thread and not root of channel
     if thread_ts:
-        conversation_id = f"{app_id}:{thread_ts}"
+        conversation_id = f"{bot_id}:{thread_ts}"
         # check if the GPT conversation history is cached in memory
         r = Redis()
         byte_result = r.get_value(conversation_id)
@@ -62,7 +62,7 @@ async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
             history = json.loads(str_result)
     # check if the message was made inside alfred jnr chat message tab
     elif str(event["channel"]).startswith("D"):
-        conversation_id = f"{app_id}:{event['channel']}"
+        conversation_id = f"{bot_id}:{event['channel']}"
         r = Redis()
         # check if the GPT conversation history is cached in memory
         byte_result = r.get_value(conversation_id)
