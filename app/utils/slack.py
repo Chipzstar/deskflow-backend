@@ -95,12 +95,25 @@ async def get_user_from_event(event, client: WebClient):
         user_id = event["user"]
         # Use the app.client method to fetch user information by ID
         response = client.users_info(user=user_id)
-        pprint(f"USER INFO:\t {response.data['user']}")
+        pprint(f"USER INFO: {response.data['user']['profile']['real_name_normalized']}")
         # Extract the username from the API response
         if response.data:
             username = response.data["user"]["profile"]["first_name"]
             pprint(f"{user_id} <=> {username}")
+            print("-"*75)
             return username
     except SlackApiError as e:
         print("Error getting user: {}".format(e))
         raise Exception(f"Error fetching user information: {e}")
+
+
+def get_conversation_id(channel, ts, client: WebClient):
+    # fetch all replies from the last message
+    conversation = client.conversations_replies(
+        channel=channel,
+        ts=ts,
+        inclusive=True
+    )
+    # get the timestamp of the root message for the conversation
+    root_message_id = conversation.data["messages"][0]['ts']
+    return root_message_id

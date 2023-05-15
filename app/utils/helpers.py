@@ -1,6 +1,19 @@
+import json
 import os, re
 from datetime import datetime
+from pprint import pprint
+from typing import List, Literal, Dict
+
 import pandas as pd
+from redis.exceptions import RedisError, ResponseError
+from slack_sdk import WebClient
+
+from app.redis.client import Redis
+from app.utils.slack import get_conversation_id
+from app.utils.types import Message
+
+ONE_DAY_IN_SECONDS = 60 * 60 * 24
+ONE_HOUR_IN_SECONDS = 60 * 60
 
 
 def validate_ticket_object(ticket_dict):
@@ -73,3 +86,37 @@ def convert_csv_embeddings_to_floats(embeddings: str) -> list[float]:
     # print(type(floats_list))
     # print(np.array(floats_list).dtype)
     return floats_list
+
+
+def cache_conversation(
+        channel_type: Literal["DM_REPLY", "DM_MESSAGE", "CHANNEL_MENTION_REPLY"],
+        last_message,
+        client: WebClient,
+        history: List[Dict[str, str]]
+):
+    try:
+        if channel_type == "CHANNEL_MENTION_REPLY" or channel_type == "DM_REPLY":
+            root_message_id = get_conversation_id(
+                last_message["channel"],
+                last_message["message"]["thread_ts"],
+                client
+            )
+            pprint(f"CONVERSATION ID: {root_message_id}")
+            r = Redis()
+            # Cache the message in Redis using the message ID as the key, TTL = 1 day
+            r.add_to_cache(root_message_id, json.dumps(history), ONE_DAY_IN_SECONDS)
+        else:
+            for message in history:
+                print(message)
+                print("-" * 80)
+            pprint(f"CONVERSATION ID: {last_message['channel']}")
+            r = Redis()
+            # Cache the message in Redis using the message ID as the key, TTL = 1 hour
+            r.add_to_cache(last_message['channel'], json.dumps(history), ONE_HOUR_IN_SECONDS)
+        return "Success"
+    except ResponseError as e:
+        print(f"Response Error: {e}")
+        return None
+    except RedisError as e:
+        print(f"Redis Error: {e}")
+        return None

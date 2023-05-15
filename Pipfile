@@ -37,6 +37,7 @@ slack-bolt = "*"
 slack = "*"
 tabulate = "*"
 python-dotenv = "*"
+redis = "*"
 
 [dev-packages]
 

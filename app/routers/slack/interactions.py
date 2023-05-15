@@ -30,13 +30,15 @@ def validate_user(body: dict) -> Tuple[bool, str]:
     # fetch the user's ID'
     user_id = body["user"]["id"]
     conversation = client.conversations_history(channel=body["channel"]["id"], limit=3)
-    # pprint(conversation.data)
-    # Retrieve the last message containing the original question asked to Alfred
-    last_message = conversation.data['messages'][2]
-    pprint(last_message)
-    print(f"{'-' * 100}{last_message['text']}{'-' * 100}")
-    # Validate that the user that clicked the button matches the user that posted the question
-    return user_id == last_message["user"], last_message
+    for message in conversation.data['messages']:
+        print(f"{'-' * 100}\n{message['text'][:100]}")
+        # check if the message is from a bot
+        if 'bot_id' in message:
+            print(f"User {message['user']} is a bot")
+            continue
+        # Validate that the user that clicked the button matches the user that posted the question
+        return user_id == message["user"], message
+    return False, conversation.data['messages'][2]
 
 
 @app.action({"action_id": "user_select"})
