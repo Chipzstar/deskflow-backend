@@ -16,6 +16,18 @@ ONE_DAY_IN_SECONDS = 60 * 60 * 24
 ONE_HOUR_IN_SECONDS = 60 * 60
 
 
+def border_asterisk():
+    print("* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *")
+
+
+def border_line():
+    print("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -")
+
+
+def border_equals():
+    print("= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =")
+
+
 def validate_ticket_object(ticket_dict):
     if not isinstance(ticket_dict, dict):
         print("Step 1: Object is not a dictionary")
@@ -139,9 +151,9 @@ def check_reply_requires_action(reply: str, messages: List[Dict[str, str]]):
 def check_can_create_ticket(reply: str, messages: List[Dict[str, str]]):
     ticket_hints = ["SUBJECT:", "BODY:", "PRIORITY:"]
     general_hints = ["Thank you for confirming", "I have created a Zendesk ticket"]
-    for hint in ticket_hints:
-        if hint.lower() not in reply.lower():
-            return False
+    # for hint in ticket_hints:
+    #     if hint.lower() not in reply.lower():
+    #         return False
     for hint in general_hints:
         if hint.lower() in reply.lower():
             return True

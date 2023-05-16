@@ -6,7 +6,7 @@ import openai
 import pandas as pd
 import tiktoken
 from openai.embeddings_utils import cosine_similarity, get_embedding
-from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object
+from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
 from app.utils.types import Message
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -40,7 +40,7 @@ ZENDESK_TICKET_FORMAT_PROMPT = f"""You are an AI assistant that converts custome
 
             <PRIORITY> = the priority of the ticket (can be one of: low, normal, high, urgent)
             <SUBJECT> = the subject of the ticket
-            <BODY> = the full description of the query
+            <BODY> = a brief description of the query
             
             Refer to the documentation for more information about how the ticket payload is formatted : 
             https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#create-ticket#"""
@@ -178,7 +178,11 @@ async def continue_chat_response(
     return sanitized_response, messages
 
 
-async def send_zendesk_ticket(query: str, system_message: str = "You are a Zendesk support ticket creator"):
+async def send_zendesk_ticket(
+        query: str,
+        requester__email: str,
+        system_message: str = "You are a Zendesk support ticket creator"
+):
     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
             
             QUERY: {query}
@@ -194,15 +198,32 @@ async def send_zendesk_ticket(query: str, system_message: str = "You are a Zende
             temperature=0,
             model=CHAT_COMPLETIONS_MODEL,
         )
-    )
-    data: Dict = json.loads(response['choices'][0]['message']['content'].replace("`", "").strip())
+    )['choices'][0]['message']['content']
+    pprint(response)
+    data: Dict = json.loads(response.replace("`", "").strip())
+    # Set up the authentication credentials
+    auth = (creds.email + "/token", creds.token)
+    # lookup the requester_id using the user's email address
+    url = f"https://{creds.subdomain}.zendesk.com/api/v2/users/search.json"
+    headers = {"Content-Type": "application/json" }
+    params = {"query": requester__email}
+    users = requests.get(url, auth=auth, headers=headers, params=params).json()['users']
+    print(requester__email)
+    print(f"Found User: {bool(len(users))}")
+    if len(users) <= 0:
+        border_asterisk()
+        print(f"Failed to find requester with email: {requester__email}")
+        border_asterisk()
+        print(data)
+    else:
+        requester_id = users[0]['id']
+        data['ticket']['requester_id'] = requester_id
+        border_line()
+        pprint(data)
     is_valid = validate_ticket_object(data)
     if not is_valid:
         print(f"Failed to create ticket using the payload: {data}")
-        print(data)
         return None
-    # Set up the authentication credentials
-    auth = (creds.email + "/token", creds.token)
     url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
     response = requests.post(
         url,
@@ -213,6 +234,7 @@ async def send_zendesk_ticket(query: str, system_message: str = "You are a Zende
     # Check the response status code
     if response.status_code == 201:
         print("Ticket created successfully")
+        border_asterisk()
         pprint(response.json())
         return response.json()['ticket']
     else:

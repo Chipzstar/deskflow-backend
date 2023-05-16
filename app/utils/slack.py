@@ -98,10 +98,10 @@ async def get_user_from_event(event, client: WebClient):
         pprint(f"USER INFO: {response.data['user']['profile']['real_name_normalized']}")
         # Extract the username from the API response
         if response.data:
-            username = response.data["user"]["profile"]["first_name"]
-            pprint(f"{user_id} <=> {username}")
+            profile = response.data["user"]["profile"]
+            pprint(f"{user_id} <=> {profile['first_name']}")
             print("-"*75)
-            return username
+            return profile
     except SlackApiError as e:
         print("Error getting user: {}".format(e))
         raise Exception(f"Error fetching user information: {e}")

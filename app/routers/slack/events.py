@@ -61,7 +61,7 @@ async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
             str_result = str(byte_result, encoding='utf-8')
             history = json.loads(str_result)
 
-    sender_name = await get_user_from_event(event, client)
+    sender_name = (await get_user_from_event(event, client))['first_name']
     # Extract raw message from the event
     raw_message = str(event["text"])
     # remove any mention tags from the message and sanitize it
@@ -154,7 +154,8 @@ async def handle_message(body, say, logger):
         reply, response, history = await generate_reply(event, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
-            await send_zendesk_ticket(reply)
+            profile = await get_user_from_event(event, client)
+            await send_zendesk_ticket(reply, profile['email'])
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
         take_action = check_reply_requires_action(reply, [])
