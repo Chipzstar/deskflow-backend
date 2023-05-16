@@ -1,7 +1,7 @@
 import json
 import logging, os
 from pprint import pprint
-from typing import Callable, List, Dict, Literal
+from typing import Callable, Literal
 
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.async_app import AsyncSay
@@ -9,8 +9,10 @@ from slack_sdk import WebClient
 from fastapi import APIRouter, Request
 
 from app.redis.client import Redis
-from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response
-from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, cache_conversation
+from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response, \
+    send_zendesk_ticket
+from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, cache_conversation, \
+    check_reply_requires_action, check_can_create_ticket
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from app.utils.slack import display_support_dialog, get_user_from_event
 
@@ -24,17 +26,6 @@ SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
 app = AsyncApp(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
 app_handler = AsyncSlackRequestHandler(app)
 client = WebClient(SLACK_BOT_TOKEN)
-
-
-async def check_reply_requires_action(reply: str, messages: List[Dict[str, str]]):
-    is_knowledge_gap = "information is not provided within the company’s knowledge base"
-    is_zendesk_ticket = "create a ticket on Zendesk"
-    is_contact_support = "ask HR/IT"
-    hints = [is_knowledge_gap, is_zendesk_ticket, is_contact_support]
-    if (is_zendesk_ticket.lower() in reply.lower()) or (is_contact_support.lower() in reply.lower()):
-        return True
-    else:
-        return False
 
 
 async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
@@ -104,7 +95,7 @@ async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
     else:
         channel_type = "CHANNEL_MENTION_REPLY"
     result = cache_conversation(channel_type, response.data, client, messages)
-    return reply, response.data
+    return reply, response.data, messages
 
 
 async def check_bot_mentioned_in_thread(channel: str, thread_ts: str):
@@ -140,11 +131,13 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
     # Check if the message was made in the main channel (outside thread)
     if not event.get("thread_ts", None):
         thread_ts = event.get("thread_ts", None) or event["ts"]
-        history = []
-        reply, response = await generate_reply(event, logger)
+        reply, response, history = await generate_reply(event, logger)
+        # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
+        if check_can_create_ticket(reply, history):
+            await send_zendesk_ticket(reply)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
-        take_action = await check_reply_requires_action(reply, [])
+        take_action = check_reply_requires_action(reply, [])
         if take_action:
             await display_support_dialog(client, response)
 
@@ -155,14 +148,16 @@ async def handle_message(body, say, logger):
     event = body["event"]
     logger.debug(event)
     thread_ts = event.get("thread_ts", None)
-    print(thread_ts)
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
-        reply, response = await generate_reply(event, logger, bool(thread_ts))
+        reply, response, history = await generate_reply(event, logger, bool(thread_ts))
+        # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
+        if check_can_create_ticket(reply, history):
+            await send_zendesk_ticket(reply)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
-        take_action = await check_reply_requires_action(reply, [])
+        take_action = check_reply_requires_action(reply, [])
         if take_action:
             await display_support_dialog(client, response)
 
@@ -174,7 +169,10 @@ async def handle_message(body, say, logger):
         is_mentioned = await check_bot_mentioned_in_thread(event['channel'], thread_ts)
         if is_mentioned:
             # extract message from event
-            reply, response = await generate_reply(event, logger)
+            reply, response, history = await generate_reply(event, logger)
+            # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
+            if check_can_create_ticket(reply, history):
+                await send_zendesk_ticket(reply)
             # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on
             # zendesk OR to contact someone from HR/IT
             take_action = await check_reply_requires_action(reply, [])

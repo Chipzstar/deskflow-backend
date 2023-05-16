@@ -123,3 +123,26 @@ def cache_conversation(
     except RedisError as e:
         print(f"Redis Error: {e}")
         return None
+
+
+def check_reply_requires_action(reply: str, messages: List[Dict[str, str]]):
+    is_knowledge_gap = "information is not provided within the company’s knowledge base"
+    is_zendesk_ticket = "create a ticket on Zendesk"
+    is_contact_support = "ask HR/IT"
+    hints = [is_knowledge_gap, is_zendesk_ticket, is_contact_support]
+    if (is_zendesk_ticket.lower() in reply.lower()) or (is_contact_support.lower() in reply.lower()):
+        return True
+    else:
+        return False
+
+
+def check_can_create_ticket(reply: str, messages: List[Dict[str, str]]):
+    ticket_hints = ["SUBJECT:", "BODY:", "PRIORITY:"]
+    general_hints = ["Thank you for confirming", "I have created a Zendesk ticket"]
+    for hint in ticket_hints:
+        if hint.lower() not in reply.lower():
+            return False
+    for hint in general_hints:
+        if hint.lower() in reply.lower():
+            return True
+    return False
