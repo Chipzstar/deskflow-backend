@@ -4,6 +4,8 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.models.blocks import SectionBlock, ActionsBlock, DividerBlock
 
+from app.utils.types import Profile
+
 
 async def display_plain_text_dialog(
         question: str,
@@ -84,6 +86,17 @@ def get_user_from_id(user_id: str, client: WebClient):
         profile = response.data["user"]["profile"]
         pprint(f"{user_id} <=> {profile['first_name']}")
         return profile
+    except SlackApiError as e:
+        print("Error getting user: {}".format(e))
+        raise Exception(f"Error fetching user information for user {user_id}: {e}")
+
+
+def get_profile_from_id(user_id: str, client: WebClient) -> Profile:
+    try:
+        response = client.users_profile_get(user=user_id)
+        profile = response.data['profile']
+        pprint(f"{user_id} <=> {profile['first_name']}")
+        return Profile(name=profile["real_name_normalized"], email=profile["email"])
     except SlackApiError as e:
         print("Error getting user: {}".format(e))
         raise Exception(f"Error fetching user information for user {user_id}: {e}")

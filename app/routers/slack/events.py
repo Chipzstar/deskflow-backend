@@ -14,7 +14,7 @@ from app.utils.gpt import get_similarities, generate_context_array, continue_cha
 from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, cache_conversation, \
     check_reply_requires_action, check_can_create_ticket
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
-from app.utils.slack import display_support_dialog, get_user_from_event
+from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id
 
 router = APIRouter()
 
@@ -134,7 +134,8 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
         reply, response, history = await generate_reply(event, logger)
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
-            await send_zendesk_ticket(reply)
+            profile = get_profile_from_id(event['user'], client)
+            await send_zendesk_ticket(reply, profile)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
         take_action = check_reply_requires_action(reply, [])
@@ -154,8 +155,8 @@ async def handle_message(body, say, logger):
         reply, response, history = await generate_reply(event, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
-            profile = await get_user_from_event(event, client)
-            await send_zendesk_ticket(reply, profile['email'])
+            profile = get_profile_from_id(event['user'], client)
+            await send_zendesk_ticket(reply, profile)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
         take_action = check_reply_requires_action(reply, [])
@@ -173,7 +174,8 @@ async def handle_message(body, say, logger):
             reply, response, history = await generate_reply(event, logger)
             # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
             if check_can_create_ticket(reply, history):
-                await send_zendesk_ticket(reply)
+                profile = get_profile_from_id(event['user'], client)
+                await send_zendesk_ticket(reply, profile)
             # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on
             # zendesk OR to contact someone from HR/IT
             take_action = await check_reply_requires_action(reply, [])

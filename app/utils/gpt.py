@@ -1,5 +1,5 @@
 from pprint import pprint
-from typing import List, Dict, TypedDict, NamedTuple
+from typing import List, Dict, TypedDict, NamedTuple, Tuple
 import os, requests, json
 import numpy as np
 import openai
@@ -7,17 +7,11 @@ import pandas as pd
 import tiktoken
 from openai.embeddings_utils import cosine_similarity, get_embedding
 from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
-from app.utils.types import Message
+from app.utils.types import Message, Credentials, Profile
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 openai.organization = os.environ["OPENAI_ORG_ID"]
 zendesk_api_key = os.environ["ZENDESK_API_KEY"]
-
-
-class Credentials(NamedTuple):
-    email: str
-    token: str
-    subdomain: str
 
 
 creds = Credentials(
@@ -180,9 +174,10 @@ async def continue_chat_response(
 
 async def send_zendesk_ticket(
         query: str,
-        requester__email: str,
+        profile: Profile,
         system_message: str = "You are a Zendesk support ticket creator"
 ):
+    pprint(f"QUERY: {query}")
     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
             
             QUERY: {query}
@@ -203,23 +198,14 @@ async def send_zendesk_ticket(
     data: Dict = json.loads(response.replace("`", "").strip())
     # Set up the authentication credentials
     auth = (creds.email + "/token", creds.token)
-    # lookup the requester_id using the user's email address
-    url = f"https://{creds.subdomain}.zendesk.com/api/v2/users/search.json"
-    headers = {"Content-Type": "application/json" }
-    params = {"query": requester__email}
-    users = requests.get(url, auth=auth, headers=headers, params=params).json()['users']
-    print(requester__email)
-    print(f"Found User: {bool(len(users))}")
-    if len(users) <= 0:
-        border_asterisk()
-        print(f"Failed to find requester with email: {requester__email}")
-        border_asterisk()
-        print(data)
-    else:
-        requester_id = users[0]['id']
-        data['ticket']['requester_id'] = requester_id
-        border_line()
-        pprint(data)
+    print(profile)
+    border_line()
+    data['ticket']['requester'] = {
+        "name": profile.name,
+        "email": profile.email
+    }
+    border_line()
+    pprint(data)
     is_valid = validate_ticket_object(data)
     if not is_valid:
         print(f"Failed to create ticket using the payload: {data}")
@@ -230,7 +216,6 @@ async def send_zendesk_ticket(
         json=data,
         auth=auth
     )
-
     # Check the response status code
     if response.status_code == 201:
         print("Ticket created successfully")
