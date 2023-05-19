@@ -12,7 +12,9 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from app.utils.gpt import send_zendesk_ticket
-from app.utils.slack import get_user_from_id, display_plain_text_dialog
+from app.utils.helpers import border_line
+from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id
+from app.utils.types import Profile
 
 router = APIRouter()
 
@@ -26,19 +28,21 @@ app_handler = AsyncSlackRequestHandler(app)
 client = WebClient(SLACK_BOT_TOKEN)
 
 
-def validate_user(body: dict) -> Tuple[bool, str]:
+def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
     # fetch the user's ID'
     user_id = body["user"]["id"]
+    profile = get_profile_from_id(user_id, client)
     conversation = client.conversations_history(channel=body["channel"]["id"], limit=3)
     for message in conversation.data['messages']:
-        print(f"{'-' * 100}\n{message['text'][:100]}")
+        border_line()
+        print(message['text'][:100])
         # check if the message is from a bot
         if 'bot_id' in message:
             print(f"User {message['user']} is a bot")
             continue
         # Validate that the user that clicked the button matches the user that posted the question
-        return user_id == message["user"], message
-    return False, conversation.data['messages'][2]
+        return user_id == message["user"], profile, message
+    return False, profile, conversation.data['messages'][2]
 
 
 @app.action({"action_id": "user_select"})
@@ -97,7 +101,7 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
 async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
     await ack()
-    authorized, last_message = validate_user(body)
+    authorized, profile, last_message = validate_user(body)
     if not authorized:
         await respond(
             replace_original=False,
@@ -110,7 +114,7 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
             text="Ok, hold on while I create your Zendesk support ticket for you",
         )
         # Create a Zendesk support ticket using the data from the action payload
-        ticket = await send_zendesk_ticket(last_message)
+        ticket = await send_zendesk_ticket(last_message, profile)
         await respond(
             replace_original=True,
             text=f":white_check_mark: Your support ticket has been created successfully. "
@@ -125,7 +129,7 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
 async def handle_contact_support(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
     await ack()
-    authorized, last_message = validate_user(body)
+    authorized, profile, last_message = validate_user(body)
     if not authorized:
         await respond(
             replace_original=False,

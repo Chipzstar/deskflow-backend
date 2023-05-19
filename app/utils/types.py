@@ -1,5 +1,16 @@
-from typing import Literal, Optional, List, Dict
+from typing import Literal, Optional, List, Dict, NamedTuple
 from pydantic import BaseModel
+
+
+class Profile(NamedTuple):
+    name: str
+    email: str
+
+
+class Credentials(NamedTuple):
+    email: str
+    token: str
+    subdomain: str
 
 
 class Message:

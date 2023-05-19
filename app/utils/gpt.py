@@ -1,17 +1,24 @@
 from pprint import pprint
-from typing import List, Dict, TypedDict, NamedTuple
+from typing import List, Dict, TypedDict, NamedTuple, Tuple
 import os, requests, json
 import numpy as np
 import openai
 import pandas as pd
 import tiktoken
 from openai.embeddings_utils import cosine_similarity, get_embedding
-from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object
-from app.utils.types import Message
+from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
+from app.utils.types import Message, Credentials, Profile
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 openai.organization = os.environ["OPENAI_ORG_ID"]
 zendesk_api_key = os.environ["ZENDESK_API_KEY"]
+
+
+creds = Credentials(
+    email="chisom@exam-genius.com",
+    token=zendesk_api_key,
+    subdomain="omnicentra",
+)
 
 # DECLARE GLOBAL VARIABLES #
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
@@ -19,12 +26,33 @@ MAX_INPUT_TOKENS = 8191
 COMPLETIONS_MODEL = "text-davinci-003"
 CHAT_COMPLETIONS_MODEL = "gpt-3.5-turbo"
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
+ZENDESK_TICKET_FORMAT_PROMPT = f"""You are an AI assistant that converts customer queries into Zendesk support tickets. 
 
+            For every query, you should understand what the query is about and format the query into the following 
+            JSON Zendesk ticket payload: `{{ "ticket": {{ "comment": {{"body": "<BODY>"}}, "priority": "<PRIORITY>", 
+            "subject": "<SUBJECT>" }} }}`
 
-class Credentials(NamedTuple):
-    email: str
-    token: str
-    subdomain: str
+            <PRIORITY> = the priority of the ticket (can be one of: low, normal, high, urgent)
+            <SUBJECT> = the subject of the ticket
+            <BODY> = a brief description of the query
+            
+            Refer to the documentation for more information about how the ticket payload is formatted : 
+            https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#create-ticket#"""
+ZENDESK_TICKET_CREATION_PROMPT = f"""You are an AI assistant that takes customer queries and extract the necessary 
+information needed to create Zendesk tickets.
+
+            You should understand what the query is about and format the query into the following format: ``` 
+            Subject: the subject of the ticket 
+            Body: a detailed description of the query including any relevant context from the conversation about the query 
+            Priority: the priority of the ticket (can be one of: low, normal, high, urgent - determine this yourself based on the severity of the issue) 
+            ```
+        
+            You should only return the above format when you have all the information needed. If there is information 
+            missing or need clarification, then do not return the above format. Instead ask the user to provide the 
+            missing information. 
+            
+            Please do NOT return any information about the ticket number. This will be provided externally via email.
+            """
 
 
 def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int:
@@ -84,6 +112,12 @@ As an experienced assistant, you can create Zendesk tickets and forward complex 
 
 The conversation is between you and {sender_name} and you should first greet them with a phrase like "Hello {sender_name}". When a HR / IT related question is asked by {sender_name}, only use information provided in the context and never use general knowledge. If the question asked is not in the context given to you or the context does not answer the question properly, you will respond apologetically saying something along the lines of "this information is not provided within the company’s knowledge base, would you like me to create a ticket on Zendesk or ask HR/IT?" and follow the steps accordingly based on their response.
 
+When given an instructional statement along the lines of "create a ticket", follow this prompt: 
+
+`{ZENDESK_TICKET_CREATION_PROMPT}`
+
+For general responses by the user you should answer as a normal human assistant would in a friendly, polite manner. 
+
 If a question is outside your scope, you will make a note of it and store it as a "knowledge gap" to learn and improve. It is important to address employees in a friendly and compassionate tone, speaking to them in first person terms.
 
 Please feel free to answer any HR or IT related questions."""
@@ -138,18 +172,13 @@ async def continue_chat_response(
     return sanitized_response, messages
 
 
-async def send_zendesk_ticket(query: str, system_message: str = "You are a Zendesk support ticket creator"):
-    message = f"""You are an AI assistant that converts customer queries into Zendesk support tickets. 
-
-            For every query, you should understand what the query is about and format the query into the 
-            following JSON Zendesk ticket payload: `{{ "ticket": {{ "comment": {{"body": "<BODY>"}}, "priority": "<PRIORITY>", "subject": 
-            "<SUBJECT>" }} }}`
-
-            <PRIORITY> = the priority of the ticket (can be one of: low, normal, high, urgent)
-            <SUBJECT> = the subject of the ticket
-            <BODY> = the full description of the query
-            
-            Refer to the documentation for more information about how the ticket payload is formatted : https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#create-ticket
+async def send_zendesk_ticket(
+        query: str,
+        profile: Profile,
+        system_message: str = "You are a Zendesk support ticket creator"
+):
+    pprint(f"QUERY: {query}")
+    message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
             
             QUERY: {query}
             """
@@ -164,31 +193,33 @@ async def send_zendesk_ticket(query: str, system_message: str = "You are a Zende
             temperature=0,
             model=CHAT_COMPLETIONS_MODEL,
         )
-    )
-    data: Dict = json.loads(response['choices'][0]['message']['content'].replace("`", "").strip())
+    )['choices'][0]['message']['content']
+    pprint(response)
+    data: Dict = json.loads(response.replace("`", "").strip())
+    # Set up the authentication credentials
+    auth = (creds.email + "/token", creds.token)
+    print(profile)
+    border_line()
+    data['ticket']['requester'] = {
+        "name": profile.name,
+        "email": profile.email
+    }
+    border_line()
+    pprint(data)
     is_valid = validate_ticket_object(data)
     if not is_valid:
         print(f"Failed to create ticket using the payload: {data}")
-        print(data)
         return None
-
-    creds = Credentials(
-        email="chisom.oguibe@googlemail.com",
-        token=zendesk_api_key,
-        subdomain="secondstechnologies",
-    )
-    # Set up the authentication credentials
-    auth = (creds.email + "/token", creds.token)
     url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
     response = requests.post(
         url,
         json=data,
         auth=auth
     )
-
     # Check the response status code
     if response.status_code == 201:
         print("Ticket created successfully")
+        border_asterisk()
         pprint(response.json())
         return response.json()['ticket']
     else:
@@ -196,3 +227,43 @@ async def send_zendesk_ticket(query: str, system_message: str = "You are a Zende
         return response.text
 
 
+# async def auto_create_zendesk_ticket(
+#         query: str,
+#         messages: List[dict[str, str]],
+#         system_message: str = "You are a Zendesk support ticket creator"
+# ):
+#     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
+#
+#                 QUERY: {query}
+#                 """
+#     messages = [
+#         {"role": "system", "content": system_message},
+#         {"role": "user", "content": message},
+#     ]
+#
+#     response = (
+#         openai.ChatCompletion.create(
+#             messages=messages,
+#             temperature=0,
+#             model=CHAT_COMPLETIONS_MODEL,
+#         )
+#     )
+#     data: Dict = json.loads(response['choices'][0]['message']['content'].replace("`", "").strip())
+#     is_valid = validate_ticket_object(data)
+#     # Set up the authentication credentials
+#     auth = (creds.email + "/token", creds.token)
+#     url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
+#     response = requests.post(
+#         url,
+#         json=data,
+#         auth=auth
+#     )
+#
+#     # Check the response status code
+#     if response.status_code == 201:
+#         print("Ticket created successfully")
+#         pprint(response.json())
+#         return response.json()['ticket']
+#     else:
+#         print(f"Failed to create ticket: {response.text}")
+#         return response.text
