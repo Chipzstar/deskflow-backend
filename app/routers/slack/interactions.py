@@ -41,8 +41,8 @@ def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
             print(f"User {message['user']} is a bot")
             continue
         # Validate that the user that clicked the button matches the user that posted the question
-        return user_id == message["user"], profile, message
-    return False, profile, conversation.data['messages'][2]
+        return user_id == message["user"], profile, message['text']
+    return False, profile, conversation.data['messages'][2]['text']
 
 
 @app.action({"action_id": "user_select"})
