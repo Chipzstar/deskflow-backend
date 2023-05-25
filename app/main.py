@@ -4,14 +4,16 @@
 
 import logging
 import os
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.db import crud, database
+from app.routers.slack import events, interactions, oauth
 from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
 from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
-from app.routers.slack import events, interactions, oauth
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,7 +33,7 @@ def get_db():
 
 api = FastAPI()
 
-origins = ["*", "http://localhost", "http://localhost:4200", "https://deskflow-nine.vercel.app"]
+origins = ["*", "http://localhost", "http://localhost:4200", "https://deskflow-app.vercel.app/", "https://deskflow-app-git-dev-deskflow.vercel.app"]
 
 api.add_middleware(
     CORSMiddleware,
