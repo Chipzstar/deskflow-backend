@@ -6,7 +6,7 @@ import logging
 import os
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import crud, database
@@ -22,7 +22,6 @@ logging.basicConfig(
 )
 
 
-# Dependency
 def get_db():
     db = database.SessionLocal()
     try:
@@ -33,7 +32,13 @@ def get_db():
 
 api = FastAPI()
 
-origins = ["*", "http://localhost", "http://localhost:4200", "https://deskflow-app.vercel.app/", "https://deskflow-app-git-dev-deskflow.vercel.app"]
+origins = [
+    "*",
+    "http://localhost",
+    "http://localhost:4200",
+    "https://deskflow-app.vercel.app/",
+    "https://deskflow-app-git-dev-deskflow.vercel.app"
+]
 
 api.add_middleware(
     CORSMiddleware,
@@ -45,7 +50,7 @@ api.add_middleware(
 
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
-api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"])
+api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"], dependencies=[Depends(get_db)])
 
 
 @api.get("/")

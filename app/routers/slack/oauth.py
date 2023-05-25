@@ -1,11 +1,25 @@
 import os
+from pprint import pprint
+from typing import Tuple
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore, Installation
-from slack_sdk.oauth.state_store import FileOAuthStateStore
+from sqlalchemy.orm import Session
 
+from app.db.crud import get_user_by_slack_state
+from app.db.database import SessionLocal
+from app.db.schemas import User
 from app.utils.types import OAuthPayload
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 router = APIRouter()
 
@@ -15,19 +29,25 @@ SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
 CLIENT_HOST = os.environ.get('CLIENT_HOST', None)
 
-# Issue and consume state parameter value on the server-side.
-state_store = FileOAuthStateStore(expiration_seconds=300, base_dir="./data")
-
 # Persist installation data and lookup it by IDs.
-installation_store = FileInstallationStore(base_dir="./data")
+installation_store = FileInstallationStore(base_dir="./data/installations")
+
+
+def verify_state(state: str, db: Session) -> Tuple[User, bool]:
+    user = get_user_by_slack_state(db=db, state=state)
+    verified = bool(user)
+    print(f"verified: {verified}")
+    return user, bool(verified)
 
 
 @router.post("/oauth/callback")
-async def oauth_callback(payload: OAuthPayload):
+async def oauth_callback(payload: OAuthPayload, db: Session = Depends(get_db)):
+    pprint(payload)
     # Retrieve the auth code and state from the request params
-    if "code" in payload:
+    if payload.code:
+        user, verified = verify_state(payload.state, db)
         # Verify the state parameter
-        if state_store.consume(payload.state):
+        if verified:
             client = WebClient()  # no prepared token needed for this
             # Complete the installation by calling oauth.v2.access API method
             oauth_response = client.oauth_v2_access(
@@ -74,7 +94,7 @@ async def oauth_callback(payload: OAuthPayload):
             )
 
             # Store the installation
-            installation_store.save(installation)
+            await installation_store.save(installation)
 
             return {"status": "Success", "message": "Thanks for installing Alfred!"}
         else:
