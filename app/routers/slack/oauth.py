@@ -1,12 +1,9 @@
 import os
-from http.client import HTTPException
 
-from fastapi import APIRouter
-from slack_bolt.app.async_app import AsyncApp
+from fastapi import APIRouter, HTTPException
 from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore, Installation
 from slack_sdk.oauth.state_store import FileOAuthStateStore
-from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 
 from app.utils.types import OAuthPayload
 
@@ -81,7 +78,7 @@ async def oauth_callback(payload: OAuthPayload):
 
             return {"status": "Success", "message": "Thanks for installing Alfred!"}
         else:
-            return HTTPException(
+            raise HTTPException(
                 detail=f"Try the installation again (the state value is already expired)",
                 status_code=400
             )
