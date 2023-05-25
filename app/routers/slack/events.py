@@ -5,8 +5,11 @@ from typing import Callable, Literal
 
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.async_app import AsyncSay
+from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_sdk import WebClient
 from fastapi import APIRouter, Request
+from slack_sdk.oauth.installation_store import FileInstallationStore
+from slack_sdk.oauth.state_store import FileOAuthStateStore
 
 from app.redis.client import Redis
 from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response, \
@@ -21,9 +24,20 @@ router = APIRouter()
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_APP_TOKEN = os.environ['SLACK_APP_TOKEN']
 SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
+SLACK_CLIENT_ID = os.environ['SLACK_CLIENT_ID']
+SLACK_CLIENT_SECRET = os.environ['SLACK_CLIENT_SECRET']
+SLACK_APP_SCOPES = os.environ['SLACK_APP_SCOPES'].split(",")
+
+oauth_settings = AsyncOAuthSettings(
+    client_id=SLACK_CLIENT_ID,
+    client_secret=SLACK_CLIENT_SECRET,
+    scopes=SLACK_APP_SCOPES,
+    installation_store=FileInstallationStore(base_dir="./data/installations"),
+    state_store=FileOAuthStateStore(expiration_seconds=600, base_dir="./data/states")
+)
 
 # Event API & Web API
-app = AsyncApp(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
+app = AsyncApp(oauth_settings=oauth_settings, signing_secret=SLACK_SIGNING_SECRET)
 app_handler = AsyncSlackRequestHandler(app)
 client = WebClient(SLACK_BOT_TOKEN)
 

@@ -1,23 +1,33 @@
 # from dotenv import load_dotenv
+#
 # load_dotenv()
+
 import logging
 import os
-
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from app.redis.client import Redis
+from app.db import crud, database
 from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
 from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
-from app.routers.slack import events, interactions
+from app.routers.slack import events, interactions, oauth
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+
+
+# Dependency
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 api = FastAPI()
 
@@ -33,6 +43,7 @@ api.add_middleware(
 
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
+api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"])
 
 
 @api.get("/")
@@ -66,4 +77,6 @@ async def chat(payload: ChatPayload):
 
 
 if __name__ == '__main__':
+    db = database.SessionLocal()
+    user = crud.get_user(db, 1)
     uvicorn.run("__main__:api", port=8080, host='127.0.0.1', reload=True)

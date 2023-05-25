@@ -37,3 +37,8 @@ class ChatPayload(BaseModel):
     name: str
     history: Optional[List[Dict[str, str]]] = []
     company: Optional[str] = "Omnicentra"
+
+
+class OAuthPayload(BaseModel):
+    code: str
+    state: str
