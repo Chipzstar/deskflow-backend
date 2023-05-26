@@ -94,7 +94,7 @@ async def oauth_callback(payload: OAuthPayload, db: Session = Depends(get_db)):
             )
 
             # Store the installation
-            await installation_store.save(installation)
+            installation_store.save(installation)
 
             return {"status": "Success", "message": "Thanks for installing Alfred!"}
         else:
