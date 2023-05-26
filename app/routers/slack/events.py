@@ -1,13 +1,15 @@
 import json
-import logging, os
+import logging
+import os
 from pprint import pprint
 from typing import Callable, Literal
 
+from fastapi import APIRouter, Request
+from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.async_app import AsyncSay
 from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_sdk import WebClient
-from fastapi import APIRouter, Request
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
@@ -16,7 +18,6 @@ from app.utils.gpt import get_similarities, generate_context_array, continue_cha
     send_zendesk_ticket
 from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, cache_conversation, \
     check_reply_requires_action, check_can_create_ticket
-from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id
 
 router = APIRouter()
@@ -32,8 +33,8 @@ oauth_settings = AsyncOAuthSettings(
     client_id=SLACK_CLIENT_ID,
     client_secret=SLACK_CLIENT_SECRET,
     scopes=SLACK_APP_SCOPES,
-    installation_store=FileInstallationStore(base_dir="./data/installations"),
-    state_store=FileOAuthStateStore(expiration_seconds=600, base_dir="./data/states")
+    installation_store=FileInstallationStore(base_dir=f"{os.getcwd()}/app/data/installations"),
+    state_store=FileOAuthStateStore(expiration_seconds=600, base_dir=f"{os.getcwd()}/app/data/states")
 )
 
 # Event API & Web API

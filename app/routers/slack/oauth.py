@@ -30,7 +30,7 @@ SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
 CLIENT_HOST = os.environ.get('CLIENT_HOST', None)
 
 # Persist installation data and lookup it by IDs.
-installation_store = FileInstallationStore(base_dir="./data/installations")
+installation_store = FileInstallationStore(base_dir=f"{os.getcwd()}/app/data/installations")
 
 
 def verify_state(state: str, db: Session) -> Tuple[User, bool]:
