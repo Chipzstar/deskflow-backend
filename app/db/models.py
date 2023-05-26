@@ -1,5 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String
 
 from .database import Base
 
@@ -19,3 +18,15 @@ class User(Base):
     slack_access_token = Column(String, default=True)
     stripe_payment_method = Column(String, default=True)
     slack_auth_state_id = Column(String, default=True)
+
+
+class Slack(Base):
+    __tablename__ = 'Slack'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(191, 'utf8mb4_unicode_ci'), nullable=False, unique=True)
+    access_token = Column(String(191, 'utf8mb4_unicode_ci'), nullable=False, server_default="")
+    team_id = Column(String(191, 'utf8mb4_unicode_ci'), nullable=False, server_default="")
+    team_name = Column(String(191, 'utf8mb4_unicode_ci'), nullable=False, server_default="")
+    bot_id = Column(String(191, 'utf8mb4_unicode_ci'), nullable=False, server_default="")
+    bot_access_token = Column(String(191, 'utf8mb4_unicode_ci'), nullable=False, server_default="")
+    scopes = Column(String(191, 'utf8mb4_unicode_ci'), nullable=False, server_default="")

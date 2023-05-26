@@ -26,3 +26,37 @@ class User(UserBase):
 
     class Config:
         orm_mode = True
+
+
+class SlackBase(BaseModel):
+    user_id: str
+    team_name: str
+    team_id: str
+    access_token: str
+    scopes: str
+    bot_id: str
+    bot_access_token: str
+
+
+class Slack(SlackBase):
+    id: int
+    user_id: str
+    team_name: str
+    team_id: str
+    access_token: str
+    scopes: str
+    bot_id: str
+    bot_access_token: str
+
+    class Config:
+        orm_mode = True
+
+
+class SlackCreate(SlackBase):
+    user_id: str
+    team_name: str
+    team_id: str
+    access_token: str
+    scopes: str
+    bot_id: str
+    bot_access_token: str
