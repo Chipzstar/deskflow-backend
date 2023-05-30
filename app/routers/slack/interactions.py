@@ -121,7 +121,7 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
 async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
     await ack()
-    authorized, profile, last_message = validate_user(body)
+    authorized, profile, last_message = await validate_user(body)
     if not authorized:
         await respond(
             replace_original=False,
