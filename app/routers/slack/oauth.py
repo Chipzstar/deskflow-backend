@@ -25,7 +25,6 @@ router = APIRouter()
 
 SLACK_CLIENT_ID = os.environ['SLACK_CLIENT_ID']
 SLACK_CLIENT_SECRET = os.environ['SLACK_CLIENT_SECRET']
-SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
 CLIENT_HOST = os.environ.get('CLIENT_HOST', None)
 

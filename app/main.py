@@ -36,6 +36,7 @@ origins = [
     "*",
     "http://localhost",
     "http://localhost:4200",
+    "https://deskflow.ngrok.app",
     "https://deskflow-app.vercel.app/",
     "https://deskflow-app-git-dev-deskflow.vercel.app"
 ]

@@ -8,29 +8,46 @@ from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.context.ack.async_ack import AsyncAck
 from slack_bolt.context.respond.async_respond import AsyncRespond
+from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.oauth.installation_store import FileInstallationStore
+from slack_sdk.oauth.state_store import FileOAuthStateStore
 
+from app.db.database import SessionLocal
 from app.utils.gpt import send_zendesk_ticket
 from app.utils.helpers import border_line
-from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id
+from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id, fetch_access_token
 from app.utils.types import Profile
 
+db = SessionLocal()
 router = APIRouter()
 
 SLACK_APP_TOKEN = os.environ['SLACK_APP_TOKEN']
-SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
+SLACK_CLIENT_ID = os.environ['SLACK_CLIENT_ID']
+SLACK_CLIENT_SECRET = os.environ['SLACK_CLIENT_SECRET']
+SLACK_APP_SCOPES = os.environ['SLACK_APP_SCOPES'].split(",")
 
 # Event API & Web API
-app = AsyncApp(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
+oauth_settings = AsyncOAuthSettings(
+    client_id=SLACK_CLIENT_ID,
+    client_secret=SLACK_CLIENT_SECRET,
+    scopes=SLACK_APP_SCOPES,
+    installation_store=FileInstallationStore(base_dir=f"{os.getcwd()}/app/data/installations"),
+    state_store=FileOAuthStateStore(expiration_seconds=600, base_dir=f"{os.getcwd()}/app/data/states")
+)
+
+app = AsyncApp(oauth_settings=oauth_settings, signing_secret=SLACK_SIGNING_SECRET)
 app_handler = AsyncSlackRequestHandler(app)
-client = WebClient(SLACK_BOT_TOKEN)
 
 
-def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
-    # fetch the user's ID'
+async def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
+    # fetch the user's ID
     user_id = body["user"]["id"]
+    pprint(body)
+    token = await fetch_access_token(body["team"]["id"], db, logging.Logger)
+    client = WebClient(token=token)
     profile = get_profile_from_id(user_id, client)
     conversation = client.conversations_history(channel=body["channel"]["id"], limit=3)
     for message in conversation.data['messages']:
@@ -51,6 +68,8 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
     pprint(body)
     channel_id = body["channel"]["id"]
     selected_user_id = body["actions"][0]["selected_user"]
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], logging.Logger)
+    client = WebClient(token=token)
     recipient = get_user_from_id(selected_user_id, client)
     logging.log(logging.DEBUG, f"Selected user: {recipient['real_name_normalized']}")
     try:
@@ -85,9 +104,10 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
 @app.action({"action_id": "reply_support"})
 async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond):
     await ack()
-    pprint(body)
     user_id = body["actions"][0]["block_id"]
     sender = body["user"]["id"]
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], logging.Logger)
+    client = WebClient(token=token)
     user_profile = get_user_from_id(user_id, client)
     client.chat_postMessage(channel=user_id, text=f"<@{sender}> says: {body['actions'][0]['value']}")
     await respond(
@@ -129,7 +149,7 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
 async def handle_contact_support(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
     await ack()
-    authorized, profile, last_message = validate_user(body)
+    authorized, profile, last_message = await validate_user(body)
     if not authorized:
         await respond(
             replace_original=False,

@@ -17,6 +17,10 @@ def get_slack(db: Session, user_id: str) -> Slack:
     return db.query(models.Slack).filter(models.Slack.id == user_id).first()
 
 
+def get_slack_by_team_id(db: Session, team_id: str) -> Slack:
+    return db.query(models.Slack).filter(models.Slack.team_id == team_id).first()
+
+
 def create_slack(db: Session, slack: SlackCreate):
     db_slack = models.Slack(
         user_id=slack.user_id,

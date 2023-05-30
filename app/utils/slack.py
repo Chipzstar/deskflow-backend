@@ -4,7 +4,18 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.models.blocks import SectionBlock, ActionsBlock, DividerBlock
 
+from app.db import database
+from app.db.crud import get_slack_by_team_id
+from app.utils.helpers import border_asterisk
 from app.utils.types import Profile
+
+
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 async def display_plain_text_dialog(
@@ -130,3 +141,17 @@ def get_conversation_id(channel, ts, client: WebClient):
     # get the timestamp of the root message for the conversation
     root_message_id = conversation.data["messages"][0]['ts']
     return root_message_id
+
+
+async def fetch_access_token(team_id: str, db, logger):
+    # fetch slack access token from database using the team_id
+    if not team_id:
+        return None
+    slack_config = get_slack_by_team_id(db=db, team_id=team_id)
+    border_asterisk()
+    print(slack_config.access_token)
+    border_asterisk()
+    if not slack_config:
+        logger.error(f"Slack config not found for team_id: {team_id}")
+        return
+    return slack_config.access_token

@@ -13,16 +13,17 @@ from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
+from app.db.database import SessionLocal
 from app.redis.client import Redis
+from app.redis.utils import cache_conversation
 from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response, \
     send_zendesk_ticket
-from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, cache_conversation, \
-    check_reply_requires_action, check_can_create_ticket
-from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id
+from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, check_reply_requires_action, \
+    check_can_create_ticket
+from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
 
 router = APIRouter()
 
-SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_APP_TOKEN = os.environ['SLACK_APP_TOKEN']
 SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
 SLACK_CLIENT_ID = os.environ['SLACK_CLIENT_ID']
@@ -40,10 +41,9 @@ oauth_settings = AsyncOAuthSettings(
 # Event API & Web API
 app = AsyncApp(oauth_settings=oauth_settings, signing_secret=SLACK_SIGNING_SECRET)
 app_handler = AsyncSlackRequestHandler(app)
-client = WebClient(SLACK_BOT_TOKEN)
 
 
-async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
+async def generate_reply(event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
     pprint(event)
     history = []
     thread_ts = event.get("thread_ts", None)
@@ -113,9 +113,9 @@ async def generate_reply(event, logger: logging.Logger, reply_in_thread=True):
     return reply, response.data, messages
 
 
-async def check_bot_mentioned_in_thread(channel: str, thread_ts: str):
+async def check_bot_mentioned_in_thread(token: str, channel: str, thread_ts: str, client: WebClient):
     response = client.conversations_replies(channel=channel, ts=thread_ts, inclusive=True)
-    bot_info = client.auth_test(token=SLACK_BOT_TOKEN)
+    bot_info = client.auth_test(token=token)
     bot_user_id = bot_info["user_id"]
     for message in response.data['messages']:
         # Check if the message was authored by the Slack bot or contains a mention of the bot user ID
@@ -143,10 +143,13 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
     print("app_mention event:")
     event = body["event"]
     logger.debug(event)
+    db = SessionLocal()
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], db, logger)
+    client = WebClient(token=token)
     # Check if the message was made in the main channel (outside thread)
     if not event.get("thread_ts", None):
         thread_ts = event.get("thread_ts", None) or event["ts"]
-        reply, response, history = await generate_reply(event, logger)
+        reply, response, history = await generate_reply(event, client, logger)
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
@@ -164,10 +167,13 @@ async def handle_message(body, say, logger):
     event = body["event"]
     logger.debug(event)
     thread_ts = event.get("thread_ts", None)
+    db = SessionLocal()
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], db, logger)
+    client = WebClient(token=token)
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
-        reply, response, history = await generate_reply(event, logger, bool(thread_ts))
+        reply, response, history = await generate_reply(event, client, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
@@ -183,17 +189,17 @@ async def handle_message(body, say, logger):
     elif thread_ts:
         print("handle_message_in_thread event:")
         # check for any messages in thread history where Alfred was tagged
-        is_mentioned = await check_bot_mentioned_in_thread(event['channel'], thread_ts)
+        is_mentioned = await check_bot_mentioned_in_thread(token, event['channel'], thread_ts, client)
         if is_mentioned:
             # extract message from event
-            reply, response, history = await generate_reply(event, logger)
+            reply, response, history = await generate_reply(event, client, logger)
             # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
             if check_can_create_ticket(reply, history):
                 profile = get_profile_from_id(event['user'], client)
                 await send_zendesk_ticket(reply, profile)
             # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on
             # zendesk OR to contact someone from HR/IT
-            take_action = await check_reply_requires_action(reply, [])
+            take_action = check_reply_requires_action(reply, [])
             if take_action:
                 await display_support_dialog(client, response)
         else:
@@ -216,6 +222,14 @@ async def handle_file_share(body, say: AsyncSay, logger):
     # if raw_message is empty, return an error message
     elif not str(event["text"]):
         await say(text="Sorry, I didn't get that. Please try again.", thread_ts=event["event_ts"])
+
+
+@app.event({"type": "message", "subtype": "message_deleted"})
+async def handle_message_deleted(body, say: AsyncSay, logger):
+    event = body["event"]
+    logger.debug(event)
+    # handle message deleted event
+    return None
 
 
 @app.command("/greet")
