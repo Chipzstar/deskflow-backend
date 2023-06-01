@@ -11,8 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import crud, database
 from app.routers.slack import events, interactions, oauth
+from app.routers.zendesk import zendesk_guide
 from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
 from app.utils.helpers import get_dataframe_from_csv
+from app.utils.slack import get_db
 from app.utils.types import ChatPayload
 
 logging.basicConfig(
@@ -20,14 +22,6 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-
-
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 api = FastAPI()
@@ -52,6 +46,7 @@ api.add_middleware(
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"], dependencies=[Depends(get_db)])
+api.include_router(zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"], dependencies=[Depends(get_db)])
 
 
 @api.get("/")
@@ -85,6 +80,4 @@ async def chat(payload: ChatPayload):
 
 
 if __name__ == '__main__':
-    db = database.SessionLocal()
-    user = crud.get_user(db, 1)
     uvicorn.run("__main__:api", port=8080, host='127.0.0.1', reload=True)

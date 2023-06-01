@@ -2,3 +2,7 @@
 wandb
 /wandb/
 /.idea/
+Pipfile.lock
+.fleet
+.ipynb_checkpoints/
+.env

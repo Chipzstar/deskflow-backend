@@ -156,8 +156,8 @@ async def continue_chat_response(
         query: str,
         context: str,
         messages: List[Dict[str, str]],
-        is_question: False
-):
+        is_question: bool = False
+) -> object:
     if is_question:
         message = Message(role="user", content=f"{query}\n\nContext: {context}")
     else:

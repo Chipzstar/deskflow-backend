@@ -1,4 +1,3 @@
-# imports
 import os
 from bs4 import BeautifulSoup
 import mwclient  # for downloading example Wikipedia articles
@@ -18,18 +17,14 @@ from scipy import spatial  # for calculating vector similarities for search
 import typing  # for type hints
 import pinecone
 
-openai.organization = os.environ["OPENAI_ORG_ID"]
-openai.api_key = os.environ["OPENAI_API_KEY"]
 
 # GLOBAL VARIABLES
-
 MAX_INPUT_TOKENS = 8191
 COMPLETIONS_MODEL = "text-davinci-003"
 CHAT_COMPLETIONS_MODEL = "gpt-3.5-turbo"
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
 ZENDESK_API_KEY = os.environ["ZENDESK_API_KEY"]
-PINECONE_API_KEY = os.environ["PINECONE_API_KEY"]
 
 # Configure Zendesk API config
 # Zenpy accepts an API token
@@ -40,10 +35,6 @@ creds = {
 }
 
 zenpy_client = Zenpy(**creds)
-
-
-def get_date_string():
-    return datetime.now().strftime("%Y-%m-%d")
 
 
 def fetch_zendesk_sections():
@@ -88,7 +79,7 @@ def create_txt_knowledge_base(articles, path: str):
         for article in articles:
             file.write(article[0] + "\n" + article[1] + "\n" + article[2] + "\n\n")
             pass
-    pass
+        pass
 
 
 def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int:
@@ -147,7 +138,7 @@ def calculate_embeddings(articles):
         embeddings.extend(batch_embeddings)
 
     return pd.DataFrame(
-        {"titles": titles, "content": content, "categories": categories, "embedding": embeddings}), embeddings
+{"titles": titles, "content": content, "categories": categories, "embedding": embeddings}), embeddings
 
 
 def save_dataframe_to_csv(df: pd.DataFrame, path: str, filename: str):
@@ -174,32 +165,3 @@ def store_embeddings_into_pinecone(
         to_upsert = zip(ids_batch, embeddings_batch, meta)
         # upsert to Pinecone
         index.upsert(vectors=list(to_upsert), namespace=email)
-
-
-def start():
-    article_sections = fetch_zendesk_sections()
-    articles = fetch_zendesk_articles_by_section(article_sections)
-
-    create_txt_knowledge_base(articles, f"{os.getcwd()}/app/knowledge_base")
-
-    # split each document/article into chunks short enough to be read.
-    cleaned_articles = clean_up_text(articles)
-    print_example_data(cleaned_articles)
-
-    # calculate embeddings
-    df, embeddings = calculate_embeddings(cleaned_articles)
-    print(df.head())
-
-    # save document chunks and knowledge base embdeddings to CSV file for local checking
-    # save_dataframe_to_csv(df, f"data/{get_date_string()}", "zendesk_vector_embeddings.csv")
-
-    # Initialise pinecone client with valid API key and environment
-    pinecone.init(api_key=PINECONE_API_KEY, environment="us-west1-gcp-free")
-    # Connect to the "Alfred" index
-    index = pinecone.Index("alfred")
-
-    # Insert the vector embeddings into the index
-    store_embeddings_into_pinecone(df, index)
-
-
-start()

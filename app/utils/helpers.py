@@ -66,8 +66,8 @@ def remove_custom_delimiters(input_str, start_delim='<@', end_delim='>'):
     return output_str
 
 
-def get_date_string():
-    return datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+def get_date_string(date_format: str = "%Y-%m-%dT%H-%M-%S"):
+    return datetime.now().strftime(date_format)
 
 
 def get_dataframe_from_csv(path: str, filename) -> pd.DataFrame:
