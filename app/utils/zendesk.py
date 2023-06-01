@@ -46,6 +46,7 @@ def fetch_zendesk_sections():
             section.name = "HR"
         sections.append(section)
         pass
+    print(f"Sections: {sections}")
     return sections
 
 
@@ -68,7 +69,7 @@ def fetch_zendesk_articles_by_section(sections):
             # pprint("--------------------------------------------------------------------------------------------------")
             my_articles.append((article.title, article.body, category))
             pass
-        return my_articles
+    return my_articles
 
 
 def create_txt_knowledge_base(articles, path: str):
