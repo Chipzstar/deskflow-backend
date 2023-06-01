@@ -48,3 +48,17 @@ def integrate_kb(db: Session = Depends(get_db)):
     # Insert the vector embeddings into the index
     store_embeddings_into_pinecone(df, index)
     return {"status": "COMPLETE"}
+
+
+@router.delete("/knowledge-base")
+def delete_kb(db: Session = Depends(get_db)):
+    pinecone.init(api_key=PINECONE_API_KEY, environment="us-west1-gcp-free"),
+    # Connect to the "Alfred" index,
+    index = pinecone.Index("alfred")
+    index_stats = index.describe_index_stats()
+    # extract the total_vector_count
+    num_vectors = int(index_stats["total_vector_count"])
+    # Use vector count to fetch all vectors in the index
+    ids = [str(x) for x in range(0,38)]
+    index.delete(ids=ids, namespace="chipzstar.dev@googlemail.com")
+    return { "status": "Success", "message": "Vectors deleted!"}
