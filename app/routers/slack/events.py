@@ -13,13 +13,26 @@ from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
+from app.db.crud import get_slack_by_team_id, get_user
 from app.db.database import SessionLocal
+from app.db.schemas import User
 from app.redis.client import Redis
 from app.redis.utils import cache_conversation
-from app.utils.gpt import get_similarities, generate_context_array, continue_chat_response, generate_gpt_chat_response, \
-    send_zendesk_ticket
-from app.utils.helpers import remove_custom_delimiters, get_dataframe_from_csv, check_reply_requires_action, \
-    check_can_create_ticket
+from app.utils.gpt import (
+    get_similarities,
+    generate_context_array,
+    continue_chat_response,
+    generate_gpt_chat_response,
+    send_zendesk_ticket,
+)
+from app.utils.helpers import (
+    remove_custom_delimiters,
+    get_dataframe_from_csv,
+    check_reply_requires_action,
+    check_can_create_ticket,
+    get_vector_embeddings_from_pinecone,
+    border_asterisk,
+)
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
 
 router = APIRouter()
@@ -35,7 +48,7 @@ oauth_settings = AsyncOAuthSettings(
     client_secret=SLACK_CLIENT_SECRET,
     scopes=SLACK_APP_SCOPES,
     installation_store=FileInstallationStore(base_dir=f"{os.getcwd()}/app/data/installations"),
-    state_store=FileOAuthStateStore(expiration_seconds=600, base_dir=f"{os.getcwd()}/app/data/states")
+    state_store=FileOAuthStateStore(expiration_seconds=600, base_dir=f"{os.getcwd()}/app/data/states"),
 )
 
 # Event API & Web API
@@ -43,8 +56,12 @@ app = AsyncApp(oauth_settings=oauth_settings, signing_secret=SLACK_SIGNING_SECRE
 app_handler = AsyncSlackRequestHandler(app)
 
 
-async def generate_reply(event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
+async def generate_reply(db: SessionLocal, event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
     pprint(event)
+    # fetch slack + user info from DB
+    slack = get_slack_by_team_id(db=db, team_id=event["team"])
+    user = get_user(db=db, user_id=slack.user_id)
+    pprint(user)
     history = []
     thread_ts = event.get("thread_ts", None)
     # initially return a message that Alfred is thinking and store metadata for that message
@@ -82,8 +99,8 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
     # remove any mention tags from the message and sanitize it
     message = remove_custom_delimiters(raw_message).strip()
     print(f"\nMESSAGE:\t {message}")
-    # download knowledge base embeddings from csv
-    knowledge_base = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
+    # download knowledge base embeddings from pinecone namespace
+    knowledge_base = get_vector_embeddings_from_pinecone("alfred", user.email)
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
     similarities = await get_similarities(message, knowledge_base)
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
@@ -149,7 +166,7 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
     # Check if the message was made in the main channel (outside thread)
     if not event.get("thread_ts", None):
         thread_ts = event.get("thread_ts", None) or event["ts"]
-        reply, response, history = await generate_reply(event, client, logger)
+        reply, response, history = await generate_reply(db, event, client, logger)
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
@@ -173,7 +190,7 @@ async def handle_message(body, say, logger):
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
-        reply, response, history = await generate_reply(event, client, logger, bool(thread_ts))
+        reply, response, history = await generate_reply(db, event, client, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
@@ -192,7 +209,7 @@ async def handle_message(body, say, logger):
         is_mentioned = await check_bot_mentioned_in_thread(token, event['channel'], thread_ts, client)
         if is_mentioned:
             # extract message from event
-            reply, response, history = await generate_reply(event, client, logger)
+            reply, response, history = await generate_reply(db, event, client, logger)
             # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
             if check_can_create_ticket(reply, history):
                 profile = get_profile_from_id(event['user'], client)

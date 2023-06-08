@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/wandb/run-20230427_164822-ft-DHHqCOc7DGaKakKe77TqhiGm/tmp" />
       <excludeFolder url="file://$MODULE_DIR$/wandb/run-20230427_164842-ft-zD4mGLOR77p3fMq32RpHdbiu/tmp" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="Pipenv (deskflow-backend)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

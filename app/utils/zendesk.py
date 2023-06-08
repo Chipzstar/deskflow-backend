@@ -9,6 +9,7 @@ import re  # for cutting <ref> links out of Wikipedia articles
 import tiktoken  # for counting tokens
 from datetime import datetime
 from tqdm.auto import tqdm  # this is our progress bar
+
 # Import the Zenpy Class
 from zenpy import Zenpy
 from zenpy.lib.api_objects import Ticket
@@ -26,18 +27,8 @@ EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
 ZENDESK_API_KEY = os.environ["ZENDESK_API_KEY"]
 
-# Configure Zendesk API config
-# Zenpy accepts an API token
-creds = {
-    "email": "chisom@exam-genius.com",
-    "token": ZENDESK_API_KEY,
-    "subdomain": "omnicentra",
-}
 
-zenpy_client = Zenpy(**creds)
-
-
-def fetch_zendesk_sections():
+def fetch_zendesk_sections(zenpy_client: Zenpy):
     sections = []
     for section in zenpy_client.help_center.sections():
         if section.name == "IT Queries":
@@ -50,7 +41,7 @@ def fetch_zendesk_sections():
     return sections
 
 
-def fetch_all_zendesk_articles():
+def fetch_all_zendesk_articles(zenpy_client: Zenpy):
     articles = zenpy_client.help_center.articles()
     for article in articles:
         pprint(article)
@@ -58,7 +49,7 @@ def fetch_all_zendesk_articles():
     return articles
 
 
-def fetch_zendesk_articles_by_section(sections):
+def fetch_zendesk_articles_by_section(zenpy_client: Zenpy, sections):
     my_articles = []
     for _section in sections:
         category = "IT" if _section.name == "IT" else "HR"
@@ -138,8 +129,10 @@ def calculate_embeddings(articles):
         batch_embeddings = [e["embedding"] for e in response["data"]]
         embeddings.extend(batch_embeddings)
 
-    return pd.DataFrame(
-{"titles": titles, "content": content, "categories": categories, "embedding": embeddings}), embeddings
+    return (
+        pd.DataFrame({"titles": titles, "content": content, "categories": categories, "embedding": embeddings}),
+        embeddings,
+    )
 
 
 def save_dataframe_to_csv(df: pd.DataFrame, path: str, filename: str):
@@ -150,19 +143,19 @@ def save_dataframe_to_csv(df: pd.DataFrame, path: str, filename: str):
 
 
 def store_embeddings_into_pinecone(
-        df: pd.DataFrame,
-        index: pinecone.Index,
-        email: str = "chipzstar.dev@googlemail.com"
+    df: pd.DataFrame, index: pinecone.Index, email: str = "chipzstar.dev@googlemail.com"
 ):
     batch_size = 32  # process everything in batches of 32
     for i in tqdm(range(0, len(df), batch_size)):
         i_end = min(i + batch_size, len(df))
-        batch = df[i: i + batch_size]
+        batch = df[i : i + batch_size]
         embeddings_batch = batch["embedding"]
         ids_batch = [str(n) for n in range(i, i_end)]
         # prep metadata and upsert batch
-        meta = [{'title': titles, "content": content, "category": categories} for
-                titles, content, categories, embeddings in batch.to_numpy()]
+        meta = [
+            {'title': titles, "content": content, "category": categories}
+            for titles, content, categories, embeddings in batch.to_numpy()
+        ]
         to_upsert = zip(ids_batch, embeddings_batch, meta)
         # upsert to Pinecone
         index.upsert(vectors=list(to_upsert), namespace=email)

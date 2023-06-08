@@ -1,5 +1,5 @@
 from pprint import pprint
-from typing import List, Dict, TypedDict, NamedTuple, Tuple
+from typing import List, Dict, TypedDict, NamedTuple, Tuple, Literal
 import os, requests, json
 import numpy as np
 import openai
@@ -62,8 +62,8 @@ def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int
     return num_tokens
 
 
-def strings_ranked_by_relatedness(
-        query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
+def strings_ranked_by_relatedness_from_csv(
+    query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
 ) -> tuple[list[str], list[float], list[np.ndarray]]:
     """Returns a list of strings and relatednesses, sorted from most related to least."""
     question_vector = get_embedding(query, EMBEDDING_MODEL)
@@ -81,11 +81,31 @@ def strings_ranked_by_relatedness(
     return strings[:top_n], relatednesses[:top_n], embedding[:top_n]
 
 
-async def get_similarities(query: str, df: pd.DataFrame) -> pd.DataFrame:
+def strings_ranked_by_relatedness_from_pinecone(
+    query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
+) -> tuple[list[str], list[float], list[np.ndarray]]:
+    """Returns a list of strings and relatednesses, sorted from most related to least."""
+    question_vector = get_embedding(query, EMBEDDING_MODEL)
+    strings_and_relatednesses = [
+        (row["content"], relatedness_fn(row["embedding"], question_vector), row["embedding"])
+        for i, row in df.iterrows()
+    ]
+    strings_and_relatednesses.sort(key=lambda x: x[1], reverse=True)
+    strings, relatednesses, embedding = zip(*strings_and_relatednesses)
+    return strings[:top_n], relatednesses[:top_n], embedding[:top_n]
+
+
+async def get_similarities(
+    query: str, df: pd.DataFrame, source: Literal["csv", "pinecone"] = "pinecone"
+) -> pd.DataFrame:
     SCORES = []
     ANSWERS = []
     EMBEDDINGS = []
-    strings, relatednesses, embeddings = strings_ranked_by_relatedness(query, df, top_n=3)
+    if source == "csv":
+        strings, relatednesses, embeddings = strings_ranked_by_relatedness_from_csv(query, df, top_n=3)
+    else:
+        strings, relatednesses, embeddings = strings_ranked_by_relatedness_from_pinecone(query, df, top_n=3)
+
     for string, relatedness, embedding in zip(strings, relatednesses, embeddings):
         ANSWERS.append(string)
         SCORES.append("%.3f" % relatedness)
@@ -134,12 +154,12 @@ Please feel free to answer any HR or IT related questions."""
 
 
 async def generate_gpt_chat_response(
-        question: str,
-        context: str,
-        sender_name: str = "Ola",
-        company: str = "Omnicentra",
-        system_message: str = f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at "
-                              f"Omnicentra",
+    question: str,
+    context: str,
+    sender_name: str = "Ola",
+    company: str = "Omnicentra",
+    system_message: str = f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at "
+    f"Omnicentra",
 ):
     message = query_message(question, context, company, MAX_INPUT_TOKENS, sender_name)
     messages = [
@@ -153,10 +173,7 @@ async def generate_gpt_chat_response(
 
 
 async def continue_chat_response(
-        query: str,
-        context: str,
-        messages: List[Dict[str, str]],
-        is_question: bool = False
+    query: str, context: str, messages: List[Dict[str, str]], is_question: bool = False
 ) -> object:
     if is_question:
         message = Message(role="user", content=f"{query}\n\nContext: {context}")
@@ -173,9 +190,7 @@ async def continue_chat_response(
 
 
 async def send_zendesk_ticket(
-        query: str,
-        profile: Profile,
-        system_message: str = "You are a Zendesk support ticket creator"
+    query: str, profile: Profile, system_message: str = "You are a Zendesk support ticket creator"
 ):
     pprint(f"QUERY: {query}")
     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
@@ -193,17 +208,16 @@ async def send_zendesk_ticket(
             temperature=0,
             model=CHAT_COMPLETIONS_MODEL,
         )
-    )['choices'][0]['message']['content']
+    )[
+        'choices'
+    ][0]['message']['content']
     pprint(response)
     data: Dict = json.loads(response.replace("`", "").strip())
     # Set up the authentication credentials
     auth = (creds.email + "/token", creds.token)
     print(profile)
     border_line()
-    data['ticket']['requester'] = {
-        "name": profile.name,
-        "email": profile.email
-    }
+    data['ticket']['requester'] = {"name": profile.name, "email": profile.email}
     border_line()
     pprint(data)
     is_valid = validate_ticket_object(data)
@@ -211,11 +225,7 @@ async def send_zendesk_ticket(
         print(f"Failed to create ticket using the payload: {data}")
         return None
     url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
-    response = requests.post(
-        url,
-        json=data,
-        auth=auth
-    )
+    response = requests.post(url, json=data, auth=auth)
     # Check the response status code
     if response.status_code == 201:
         print("Ticket created successfully")

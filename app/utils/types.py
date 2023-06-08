@@ -35,6 +35,7 @@ class Payload(BaseModel):
 class ChatPayload(BaseModel):
     query: str
     name: str
+    email: str
     history: Optional[List[Dict[str, str]]] = []
     company: Optional[str] = "Omnicentra"
 
@@ -42,3 +43,8 @@ class ChatPayload(BaseModel):
 class OAuthPayload(BaseModel):
     code: str
     state: str
+
+
+class ZendeskKBPayload(BaseModel):
+    token: str
+    subdomain: str

@@ -1,23 +1,23 @@
 from sqlalchemy.orm import Session
 
 from app.db import models
-from app.db.schemas import Slack, SlackCreate
+from app.db.schemas import Slack, SlackCreate, User
 
 
-def get_user(db: Session, user_id: int):
+def get_user(db: Session, user_id: str) -> User | None:
     return db.query(models.User).filter(models.User.id == user_id).first()
 
 
-def get_user_by_slack_state(db: Session, state: str):
+def get_user_by_slack_state(db: Session, state: str) -> User | None:
     print(f"State: {state}")
     return db.query(models.User).filter(models.User.slack_auth_state_id == state).first()
 
 
-def get_slack(db: Session, user_id: str) -> Slack:
+def get_slack(db: Session, user_id: str) -> Slack | None:
     return db.query(models.Slack).filter(models.Slack.id == user_id).first()
 
 
-def get_slack_by_team_id(db: Session, team_id: str) -> Slack:
+def get_slack_by_team_id(db: Session, team_id: str) -> Slack | None:
     return db.query(models.Slack).filter(models.Slack.team_id == team_id).first()
 
 
@@ -29,7 +29,7 @@ def create_slack(db: Session, slack: SlackCreate):
         team_name=slack.team_name,
         scopes=slack.scopes,
         bot_id=slack.bot_id,
-        bot_access_token=slack.bot_access_token
+        bot_access_token=slack.bot_access_token,
     )
     db.add(db_slack)
     db.commit()

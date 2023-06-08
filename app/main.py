@@ -4,6 +4,7 @@
 
 import logging
 import os
+from pprint import pprint
 
 import uvicorn
 from fastapi import FastAPI, Depends
@@ -13,7 +14,7 @@ from app.db import crud, database
 from app.routers.slack import events, interactions, oauth
 from app.routers.zendesk import zendesk_guide
 from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
-from app.utils.helpers import get_dataframe_from_csv
+from app.utils.helpers import get_dataframe_from_csv, get_vector_embeddings_from_pinecone
 from app.utils.slack import get_db
 from app.utils.types import ChatPayload
 
@@ -32,7 +33,7 @@ origins = [
     "http://localhost:4200",
     "https://deskflow.ngrok.app",
     "https://deskflow-app.vercel.app/",
-    "https://deskflow-app-git-dev-deskflow.vercel.app"
+    "https://deskflow-app-git-dev-deskflow.vercel.app",
 ]
 
 api.add_middleware(
@@ -46,7 +47,9 @@ api.add_middleware(
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"], dependencies=[Depends(get_db)])
-api.include_router(zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"], dependencies=[Depends(get_db)])
+api.include_router(
+    zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"], dependencies=[Depends(get_db)]
+)
 
 
 @api.get("/")
@@ -61,18 +64,20 @@ def get_cwd():
 
 @api.post("/api/v1/generate-chat-response")
 async def chat(payload: ChatPayload):
-    print(payload)
+    pprint(payload)
     # download knowledge base embeddings from csv
     knowledge_base = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
-    similarities = await get_similarities(payload.query, knowledge_base)
+    similarities = await get_similarities(payload.query, knowledge_base, "csv")
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
     context = generate_context_array(similarities)
     print(context.split("\n"))
     print("-" * 50)
     # check if the query is the first question of the conversation
     if len(payload.history):
-        response, messages = await continue_chat_response(payload.query, context, payload.history)
+        # check if the message from user was a question or not
+        is_question = '?' in payload.query
+        response, messages = await continue_chat_response(payload.query, context, payload.history, is_question)
     else:
         response, messages = await generate_gpt_chat_response(payload.query, context, payload.name)
     print(response)

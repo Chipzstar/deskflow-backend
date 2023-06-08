@@ -129,7 +129,7 @@ Please feel free to answer any {category} related questions, and do your best to
 
 
 def start(query: str, category: typing.Literal["IT", "HR"], company: str = "Omnicentra"):
-    DF = get_dataframe_from_csv("data", "zendesk_vector_embeddings.csv")
+    DF = get_dataframe_from_csv("../data", "zendesk_vector_embeddings.csv")
 
     strings, relatednesses, embedding = strings_ranked_by_relatedness(query, DF, top_n=1)
     for string, relatedness in zip(strings, relatednesses):

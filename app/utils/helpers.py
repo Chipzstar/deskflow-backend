@@ -2,7 +2,7 @@ import os
 import re
 from datetime import datetime
 from typing import List, Dict
-
+from app.pinecone.client import Pinecone
 import pandas as pd
 
 ONE_DAY_IN_SECONDS = 60 * 60 * 24
@@ -76,6 +76,32 @@ def get_dataframe_from_csv(path: str, filename) -> pd.DataFrame:
         dtype={'title': str, 'content': str, 'embedding': str},
     )
     return df
+
+
+def get_vector_embeddings_from_pinecone(index_name: str, namespace: str = "chipzstar.dev@googlemail.com"):
+    titles = []
+    content = []
+    categories = []
+    embeddings = []
+    p = Pinecone()
+    # Connect to the index <INDEX_NAME> provided
+    index = p.index(index_name)
+    # describe the pincone index
+    index_stats = index.describe_index_stats()
+    # extract the total_vector_count
+    num_vectors = int(index_stats["total_vector_count"])
+    # Use vector count to fetch all vectors in the index
+    ids = [str(x) for x in range(0, 38)]
+    vectors = (index.fetch(ids=ids, namespace=namespace))["vectors"]
+    # Keys = list(vectors.keys())
+    # Keys.sort(key=int)
+    # iterate over each vector space and append to pandas dataframe
+    for i, (k, v) in enumerate(sorted(vectors.items(), key=lambda item: int(item[0]))):
+        titles.append(v["metadata"]["title"])
+        content.append(v["metadata"]["content"])
+        categories.append(v["metadata"]["category"])
+        embeddings.append(v["values"])
+    return pd.DataFrame({"titles": titles, "content": content, "categories": categories, "embedding": embeddings})
 
 
 def save_dataframe_to_csv(df: pd.DataFrame, path: str, filename: str):
