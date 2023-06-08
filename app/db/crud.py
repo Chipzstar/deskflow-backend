@@ -5,7 +5,7 @@ from app.db.schemas import Slack, SlackCreate, User
 
 
 def get_user(db: Session, user_id: str) -> User | None:
-    return db.query(models.User).filter(models.User.id == user_id).first()
+    return db.query(models.User).filter(models.User.clerk_id == user_id).first()
 
 
 def get_user_by_slack_state(db: Session, state: str) -> User | None:
