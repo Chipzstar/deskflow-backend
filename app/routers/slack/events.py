@@ -15,7 +15,6 @@ from slack_sdk.oauth.state_store import FileOAuthStateStore
 
 from app.db.crud import get_slack_by_team_id, get_user
 from app.db.database import SessionLocal
-from app.db.schemas import User
 from app.redis.client import Redis
 from app.redis.utils import cache_conversation
 from app.utils.gpt import (
@@ -27,11 +26,9 @@ from app.utils.gpt import (
 )
 from app.utils.helpers import (
     remove_custom_delimiters,
-    get_dataframe_from_csv,
     check_reply_requires_action,
     check_can_create_ticket,
     get_vector_embeddings_from_pinecone,
-    border_asterisk,
 )
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
 
@@ -61,7 +58,7 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
     # fetch slack + user info from DB
     slack = get_slack_by_team_id(db=db, team_id=event["team"])
     user = get_user(db=db, user_id=slack.user_id)
-    pprint(user)
+    logger.debug(user)
     history = []
     thread_ts = event.get("thread_ts", None)
     # initially return a message that Alfred is thinking and store metadata for that message
