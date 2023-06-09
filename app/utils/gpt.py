@@ -1,24 +1,24 @@
+import json
+import os
+import urllib3
 from pprint import pprint
-from typing import List, Dict, TypedDict, NamedTuple, Tuple, Literal
-import os, requests, json
+from typing import List, Dict, Literal
+
 import numpy as np
 import openai
 import pandas as pd
 import tiktoken
 from openai.embeddings_utils import cosine_similarity, get_embedding
+from sqlalchemy.orm import Session
+
+from app.db.crud import get_zendesk
+from app.db.schemas import User, Zendesk
 from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
-from app.utils.types import Message, Credentials, Profile
+from app.utils.types import Message, Profile, ZendeskOAuthCredentials
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 openai.organization = os.environ["OPENAI_ORG_ID"]
 zendesk_api_key = os.environ["ZENDESK_API_KEY"]
-
-
-creds = Credentials(
-    email="chisom@exam-genius.com",
-    token=zendesk_api_key,
-    subdomain="omnicentra",
-)
 
 # DECLARE GLOBAL VARIABLES #
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
@@ -53,6 +53,8 @@ information needed to create Zendesk tickets.
             
             Please do NOT return any information about the ticket number. This will be provided externally via email.
             """
+
+https = urllib3.PoolManager()
 
 
 def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int:
@@ -190,9 +192,11 @@ async def continue_chat_response(
 
 
 async def send_zendesk_ticket(
-    query: str, profile: Profile, system_message: str = "You are a Zendesk support ticket creator"
+    query: str,
+    profile: Profile,
+    zendesk: Zendesk,
+    system_message: str = "You are a Zendesk support ticket creator",
 ):
-    pprint(f"QUERY: {query}")
     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
             
             QUERY: {query}
@@ -202,7 +206,7 @@ async def send_zendesk_ticket(
         {"role": "user", "content": message},
     ]
 
-    response = (
+    completion = (
         openai.ChatCompletion.create(
             messages=messages,
             temperature=0,
@@ -211,11 +215,13 @@ async def send_zendesk_ticket(
     )[
         'choices'
     ][0]['message']['content']
-    pprint(response)
-    data: Dict = json.loads(response.replace("`", "").strip())
+    pprint(completion)
+    data: Dict = json.loads(completion.replace("`", "").strip())
     # Set up the authentication credentials
-    auth = (creds.email + "/token", creds.token)
-    print(profile)
+    creds = ZendeskOAuthCredentials(
+        oauth_token=zendesk.access_token,
+        subdomain=zendesk.subdomain,
+    )
     border_line()
     data['ticket']['requester'] = {"name": profile.name, "email": profile.email}
     border_line()
@@ -225,16 +231,21 @@ async def send_zendesk_ticket(
         print(f"Failed to create ticket using the payload: {data}")
         return None
     url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
-    response = requests.post(url, json=data, auth=auth)
+    response = https.request(
+        'POST',
+        url,
+        body=data,
+        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {creds.oauth_token}'},
+    )
     # Check the response status code
-    if response.status_code == 201:
+    if response.status == 201:
         print("Ticket created successfully")
         border_asterisk()
         pprint(response.json())
         return response.json()['ticket']
     else:
-        print(f"Failed to create ticket: {response.text}")
-        return response.text
+        print(f"Failed to create ticket: {response.data}")
+        return response.data
 
 
 # async def auto_create_zendesk_ticket(

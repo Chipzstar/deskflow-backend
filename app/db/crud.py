@@ -1,24 +1,33 @@
 from sqlalchemy.orm import Session
 
 from app.db import models
-from app.db.schemas import Slack, SlackCreate, User
+from app.db.schemas import Slack, SlackCreate, User, Zendesk
 
 
 def get_user(db: Session, user_id: str) -> User | None:
+    """READS a user from the database using the user_id."""
     return db.query(models.User).filter(models.User.clerk_id == user_id).first()
 
 
 def get_user_by_slack_state(db: Session, state: str) -> User | None:
+    """READS a user from the database using the slack_state."""
     print(f"State: {state}")
     return db.query(models.User).filter(models.User.slack_auth_state_id == state).first()
 
 
 def get_slack(db: Session, user_id: str) -> Slack | None:
-    return db.query(models.Slack).filter(models.Slack.id == user_id).first()
+    """READS a slack config from the database using the user_id."""
+    return db.query(models.Slack).filter(models.Slack.user_id == user_id).first()
 
 
 def get_slack_by_team_id(db: Session, team_id: str) -> Slack | None:
+    """READS a slack config from the database using the team_id."""
     return db.query(models.Slack).filter(models.Slack.team_id == team_id).first()
+
+
+def get_zendesk(db: Session, user_id: str) -> Zendesk | None:
+    """READS a zendesk config from the database using the user_id."""
+    return db.query(models.Zendesk).filter(models.Zendesk.user_id == user_id).first()
 
 
 def create_slack(db: Session, slack: SlackCreate):

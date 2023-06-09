@@ -13,7 +13,7 @@ from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
-from app.db.crud import get_slack_by_team_id, get_user
+from app.db.crud import get_slack_by_team_id, get_user, get_zendesk
 from app.db.database import SessionLocal
 from app.redis.client import Redis
 from app.redis.utils import cache_conversation
@@ -124,7 +124,7 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
     else:
         channel_type = "CHANNEL_MENTION_REPLY"
     result = cache_conversation(channel_type, response.data, client, messages)
-    return reply, response.data, messages
+    return reply, response.data, messages, user
 
 
 async def check_bot_mentioned_in_thread(token: str, channel: str, thread_ts: str, client: WebClient):
@@ -163,11 +163,13 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
     # Check if the message was made in the main channel (outside thread)
     if not event.get("thread_ts", None):
         thread_ts = event.get("thread_ts", None) or event["ts"]
-        reply, response, history = await generate_reply(db, event, client, logger)
+        reply, response, history, user = await generate_reply(db, event, client, logger)
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
-            await send_zendesk_ticket(reply, profile)
+            # fetch zendesk config for the user in DB
+            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+            await send_zendesk_ticket(reply, profile, zendesk)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
         take_action = check_reply_requires_action(reply, [])
@@ -176,7 +178,7 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
 
 
 @app.event({"type": "message"})
-async def handle_message(body, say, logger):
+async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
     # Log message
     event = body["event"]
     logger.debug(event)
@@ -187,11 +189,19 @@ async def handle_message(body, say, logger):
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
-        reply, response, history = await generate_reply(db, event, client, logger, bool(thread_ts))
+        reply, response, history, user = await generate_reply(db, event, client, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
-            profile = get_profile_from_id(event['user'], client)
-            await send_zendesk_ticket(reply, profile)
+            slack_profile = get_profile_from_id(event['user'], client)
+            # fetch zendesk config for the user in DB
+            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+            if zendesk:
+                await send_zendesk_ticket(reply, slack_profile, zendesk)
+            else:
+                await say(
+                    text=f"Sorry, it looks you haven't integrated your Zendesk account yet on Deskflow. Please "
+                    f"confirm with your manager that this has been setup or contact us at support@deskflow.ai"
+                )
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
         take_action = check_reply_requires_action(reply, [])
@@ -206,11 +216,21 @@ async def handle_message(body, say, logger):
         is_mentioned = await check_bot_mentioned_in_thread(token, event['channel'], thread_ts, client)
         if is_mentioned:
             # extract message from event
-            reply, response, history = await generate_reply(db, event, client, logger)
+            reply, response, history, user = await generate_reply(db, event, client, logger)
             # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
             if check_can_create_ticket(reply, history):
-                profile = get_profile_from_id(event['user'], client)
-                await send_zendesk_ticket(reply, profile)
+                slack_profile = get_profile_from_id(event['user'], client)
+                # fetch zendesk config for the user in DB
+                zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+                if zendesk:
+                    await send_zendesk_ticket(reply, slack_profile, zendesk)
+                else:
+                    await say(
+                        thread_ts=thread_ts,
+                        text=f"Sorry, it looks you haven't integrated your Zendesk account yet on Deskflow. "
+                        f"Please confirm with your manager that this has been setup or contact us at "
+                        f"support@deskflow.ai",
+                    )
             # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on
             # zendesk OR to contact someone from HR/IT
             take_action = check_reply_requires_action(reply, [])

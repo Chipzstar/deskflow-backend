@@ -7,9 +7,14 @@ class Profile(NamedTuple):
     email: str
 
 
-class Credentials(NamedTuple):
+class ZendeskCredentials(NamedTuple):
     email: str
     token: str
+    subdomain: str
+
+
+class ZendeskOAuthCredentials(NamedTuple):
+    oauth_token: str
     subdomain: str
 
 

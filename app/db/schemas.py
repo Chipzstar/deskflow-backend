@@ -60,3 +60,27 @@ class SlackCreate(SlackBase):
     scopes: str
     bot_id: str
     bot_access_token: str
+
+
+class ZendeskBase(BaseModel):
+    user_id: str
+    access_token: str
+    subdomain: str
+    account_email: str
+    account_id: str
+    guide: bool
+    support: bool
+
+
+class Zendesk(ZendeskBase):
+    id: int
+    user_id: str
+    access_token: str
+    subdomain: str
+    account_email: str
+    account_id: str
+    guide: bool
+    support: bool
+
+    class Config:
+        orm_mode = True
