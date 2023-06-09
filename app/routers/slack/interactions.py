@@ -109,7 +109,6 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
     sender = body["user"]["id"]
     token = await fetch_access_token(body["authorizations"][0]["team_id"], logging.Logger)
     client = WebClient(token=token)
-    user_profile = get_user_from_id(user_id, client)
     client.chat_postMessage(channel=user_id, text=f"<@{sender}> says: {body['actions'][0]['value']}")
     await respond(
         replace_original=True,

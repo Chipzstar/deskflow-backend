@@ -1,6 +1,5 @@
 import json
 import os
-import urllib3
 from pprint import pprint
 from typing import List, Dict, Literal
 
@@ -8,11 +7,10 @@ import numpy as np
 import openai
 import pandas as pd
 import tiktoken
+import urllib3
 from openai.embeddings_utils import cosine_similarity, get_embedding
-from sqlalchemy.orm import Session
 
-from app.db.crud import get_zendesk
-from app.db.schemas import User, Zendesk
+from app.db.schemas import Zendesk
 from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
 from app.utils.types import Message, Profile, ZendeskOAuthCredentials
 

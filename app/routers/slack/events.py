@@ -29,6 +29,7 @@ from app.utils.helpers import (
     check_reply_requires_action,
     check_can_create_ticket,
     get_vector_embeddings_from_pinecone,
+    border_asterisk,
 )
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
 
@@ -98,6 +99,11 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
     print(f"\nMESSAGE:\t {message}")
     # download knowledge base embeddings from pinecone namespace
     knowledge_base = get_vector_embeddings_from_pinecone("alfred", user.email)
+    border_asterisk()
+    print(knowledge_base.head())
+    print(knowledge_base.tail())
+    print(knowledge_base.count())
+    border_asterisk()
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
     similarities = await get_similarities(message, knowledge_base)
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
