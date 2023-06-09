@@ -120,6 +120,7 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
 @app.action({"action_id": "create_ticket"})
 async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
+    pprint(body)
     await ack()
     authorized, profile, last_message = await validate_user(body)
     if not authorized:
