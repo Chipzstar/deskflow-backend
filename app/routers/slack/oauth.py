@@ -97,19 +97,21 @@ async def oauth_callback(payload: OAuthPayload, db: Session = Depends(get_db)):
             # search for slack entity in DB
             slack = await get_slack(db=db, user_id=user.clerk_id)
             if slack is None:
-                slack = create_slack(db=db, slack=SlackCreate(
-                    user_id=user.clerk_id,
-                    access_token=bot_token,
-                    team_id=installed_team.get("id"),
-                    team_name=installed_team.get("name"),
-                    bot_id=bot_id,
-                    bot_access_token=bot_token,
-                    scopes=oauth_response.get("scope")
-                ))
+                slack = create_slack(
+                    db=db,
+                    slack=SlackCreate(
+                        user_id=user.clerk_id,
+                        access_token=bot_token,
+                        team_id=installed_team.get("id"),
+                        team_name=installed_team.get("name"),
+                        bot_id=bot_id,
+                        bot_access_token=bot_token,
+                        scopes=oauth_response.get("scope"),
+                    )
+                )
             return {"status": "Success", "message": "Thanks for installing Alfred!"}
         else:
             raise HTTPException(
-                detail=f"Try the installation again (the state value is already expired)",
-                status_code=400
+                detail=f"Try the installation again (the state value is already expired)", status_code=400
             )
     raise HTTPException(status_code=404, detail="Authorization code was not provided!")
