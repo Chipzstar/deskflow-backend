@@ -14,7 +14,7 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
-from app.db.crud import get_zendesk, get_user, get_slack_by_team_id
+from app.db.crud import get_zendesk, get_slack_by_team_id
 from app.db.database import SessionLocal
 from app.utils.gpt import send_zendesk_ticket
 from app.utils.helpers import border_line
@@ -120,8 +120,8 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
 @app.action({"action_id": "create_ticket"})
 async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
-    pprint(body)
     await ack()
+    pprint(body)
     authorized, profile, last_message = await validate_user(body)
     if not authorized:
         await respond(
@@ -135,9 +135,9 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
             text="Ok, hold on while I create your Zendesk support ticket for you",
         )
         # fetch user from the DB
-        slack = get_slack_by_team_id(db=db, team_id=body["team"])
+        slack = await get_slack_by_team_id(db=db, team_id=body["team"])
         # fetch zendesk config for the user in DB
-        zendesk = get_zendesk(db=db, user_id=slack.user_id)
+        zendesk = await get_zendesk(db=db, user_id=slack.user_id)
         # Create a Zendesk support ticket using the data from the action payload
         ticket = await send_zendesk_ticket(last_message, profile, zendesk)
         await respond(
