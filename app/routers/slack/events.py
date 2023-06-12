@@ -29,7 +29,6 @@ from app.utils.helpers import (
     check_reply_requires_action,
     check_can_create_ticket,
     get_vector_embeddings_from_pinecone,
-    border_asterisk,
 )
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
 
@@ -57,8 +56,8 @@ app_handler = AsyncSlackRequestHandler(app)
 async def generate_reply(db: SessionLocal, event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
     pprint(event)
     # fetch slack + user info from DB
-    slack = await get_slack_by_team_id(db=db, team_id=event["team"])
-    user = await get_user(db=db, user_id=slack.user_id)
+    slack = get_slack_by_team_id(db=db, team_id=event["team"])
+    user = get_user(db=db, user_id=slack.user_id)
     logger.debug(user)
     history = []
     thread_ts = event.get("thread_ts", None)
@@ -169,7 +168,7 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
             # fetch zendesk config for the user in DB
-            zendesk = await get_zendesk(db=db, user_id=user.clerk_id)
+            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
             await send_zendesk_ticket(reply, profile, zendesk)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
@@ -195,7 +194,7 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
         if check_can_create_ticket(reply, history):
             slack_profile = get_profile_from_id(event['user'], client)
             # fetch zendesk config for the user in DB
-            zendesk = await get_zendesk(db=db, user_id=user.clerk_id)
+            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
             if zendesk:
                 await send_zendesk_ticket(reply, slack_profile, zendesk)
             else:
@@ -222,7 +221,7 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
             if check_can_create_ticket(reply, history):
                 slack_profile = get_profile_from_id(event['user'], client)
                 # fetch zendesk config for the user in DB
-                zendesk = await get_zendesk(db=db, user_id=user.clerk_id)
+                zendesk = get_zendesk(db=db, user_id=user.clerk_id)
                 if zendesk:
                     await send_zendesk_ticket(reply, slack_profile, zendesk)
                 else:

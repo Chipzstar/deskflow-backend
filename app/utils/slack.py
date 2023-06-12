@@ -18,15 +18,28 @@ def get_db():
         db.close()
 
 
-async def display_plain_text_dialog(question: str, sender_id: str, recipient_name: str, client: WebClient, response):
+async def display_plain_text_dialog(
+        question: str,
+        sender_id: str,
+        recipient_name: str,
+        client: WebClient,
+        response
+):
     pprint(response)
     blocks = [
         {
             "type": "input",
             "dispatch_action": True,
             "block_id": sender_id,
-            "element": {"type": "plain_text_input", "action_id": "reply_support"},
-            "label": {"type": "plain_text", "text": question, "emoji": True},
+            "element": {
+                "type": "plain_text_input",
+                "action_id": "reply_support"
+            },
+            "label": {
+                "type": "plain_text",
+                "text": question,
+                "emoji": True
+            },
         }
     ]
     # Post a message to a user using the interactivity pointer
@@ -43,21 +56,31 @@ async def display_support_dialog(client: WebClient, response):
     # Create an interactivity pointer for the "Create ticket" button
     create_ticket_pointer = {
         "type": "button",
-        "text": {"type": "plain_text", "text": "Create ticket"},
+        "text": {
+            "type": "plain_text",
+            "text": "Create ticket"
+        },
         "style": "primary",
-        "action_id": "create_ticket",
+        "action_id": "create_ticket"
     }
 
     # Create an interactivity pointer for the "Cancel" button
     cancel_pointer = {
         "type": "button",
-        "text": {"type": "plain_text", "text": "Contact HR/IT Support"},
+        "text": {
+            "type": "plain_text",
+            "text": "Contact HR/IT Support"
+        },
         "style": "danger",
-        "action_id": "contact_support",
+        "action_id": "contact_support"
     }
     # Create a message block containing the header and buttons
-    header = SectionBlock(text="Create Zendesk Support Ticket")
-    buttons = ActionsBlock(elements=[create_ticket_pointer, cancel_pointer])
+    header = SectionBlock(
+        text="Create Zendesk Support Ticket"
+    )
+    buttons = ActionsBlock(
+        elements=[create_ticket_pointer, cancel_pointer]
+    )
     divider = DividerBlock()
     block = [divider, buttons]
     # Post a message to a user using the interactivity pointer
@@ -101,7 +124,7 @@ async def get_user_from_event(event, client: WebClient):
         if response.data:
             profile = response.data["user"]["profile"]
             pprint(f"{user_id} <=> {profile['first_name']}")
-            print("-" * 75)
+            print("-"*75)
             return profile
     except SlackApiError as e:
         print("Error getting user: {}".format(e))
@@ -110,7 +133,11 @@ async def get_user_from_event(event, client: WebClient):
 
 def get_conversation_id(channel, ts, client: WebClient):
     # fetch all replies from the last message
-    conversation = client.conversations_replies(channel=channel, ts=ts, inclusive=True)
+    conversation = client.conversations_replies(
+        channel=channel,
+        ts=ts,
+        inclusive=True
+    )
     # get the timestamp of the root message for the conversation
     root_message_id = conversation.data["messages"][0]['ts']
     return root_message_id
@@ -120,7 +147,7 @@ async def fetch_access_token(team_id: str, db, logger):
     # fetch slack access token from database using the team_id
     if not team_id:
         return None
-    slack_config = await get_slack_by_team_id(db=db, team_id=team_id)
+    slack_config = get_slack_by_team_id(db=db, team_id=team_id)
     border_asterisk()
     print(slack_config.access_token)
     border_asterisk()

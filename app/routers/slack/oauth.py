@@ -32,8 +32,8 @@ CLIENT_HOST = os.environ.get('CLIENT_HOST', None)
 installation_store = FileInstallationStore(base_dir=f"{os.getcwd()}/app/data/installations")
 
 
-async def verify_state(state: str, db: Session) -> Tuple[User, bool]:
-    user = await get_user_by_slack_state(db=db, state=state)
+def verify_state(state: str, db: Session) -> Tuple[User, bool]:
+    user = get_user_by_slack_state(db=db, state=state)
     verified = bool(user)
     print(f"verified: {verified}")
     return user, bool(verified)
@@ -44,7 +44,7 @@ async def oauth_callback(payload: OAuthPayload, db: Session = Depends(get_db)):
     pprint(payload)
     # Retrieve the auth code and state from the request params
     if payload.code:
-        user, verified = await verify_state(payload.state, db)
+        user, verified = verify_state(payload.state, db)
         # Verify the state parameter
         if verified:
             client = WebClient()  # no prepared token needed for this
@@ -95,7 +95,7 @@ async def oauth_callback(payload: OAuthPayload, db: Session = Depends(get_db)):
             # Store the installation
             installation_store.save(installation)
             # search for slack entity in DB
-            slack = await get_slack(db=db, user_id=user.clerk_id)
+            slack = get_slack(db=db, user_id=user.clerk_id)
             if slack is None:
                 slack = create_slack(
                     db=db,

@@ -135,9 +135,9 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
             text="Ok, hold on while I create your Zendesk support ticket for you",
         )
         # fetch user from the DB
-        slack = await get_slack_by_team_id(db=db, team_id=body["team"]["id"])
+        slack = get_slack_by_team_id(db=db, team_id=body["team"]["id"])
         # fetch zendesk config for the user in DB
-        zendesk = await get_zendesk(db=db, user_id=slack.user_id)
+        zendesk = get_zendesk(db=db, user_id=slack.user_id)
         # Create a Zendesk support ticket using the data from the action payload
         ticket = await send_zendesk_ticket(last_message, profile, zendesk)
         await respond(
