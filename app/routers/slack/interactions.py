@@ -140,14 +140,21 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
         zendesk = get_zendesk(db=db, user_id=slack.user_id)
         # Create a Zendesk support ticket using the data from the action payload
         ticket = await send_zendesk_ticket(last_message, profile, zendesk)
-        await respond(
-            replace_original=True,
-            text=f":white_check_mark: Your support ticket has been created successfully. "
-            f"\nTicket ID: #{ticket['id']}"
-            f"\nSubject: {ticket['subject']}"
-            f"\nDescription: {ticket['description']}"
-            f"\nCreated at: {ticket['created_at']}",
-        )
+        if ticket:
+            await respond(
+                replace_original=True,
+                text=f":white_check_mark: Your support ticket has been created successfully. "
+                f"\nTicket ID: #{ticket['id']}"
+                f"\nSubject: {ticket['subject']}"
+                f"\nDescription: {ticket['description']}"
+                f"\nCreated at: {ticket['created_at']}",
+            )
+        else:
+            await respond(
+                replace_original=True,
+                text=f"Something went wrong while creating your support ticket. "
+                f"Please try again later",
+            )
 
 
 @app.action({"action_id": "contact_support"})
