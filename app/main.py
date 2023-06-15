@@ -34,6 +34,8 @@ origins = [
     "https://deskflow.ngrok.app",
     "https://deskflow-app.vercel.app/",
     "https://deskflow-app-git-dev-deskflow.vercel.app",
+    "https://dev.deskflow.ai",
+    "https://app.deskflow.ai"
 ]
 
 api.add_middleware(
