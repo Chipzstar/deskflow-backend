@@ -1,6 +1,6 @@
-# from dotenv import load_dotenv
-#
-# load_dotenv()
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import logging
 import os
@@ -12,7 +12,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.prisma_client import prisma
 from app.routers.slack import events, interactions, oauth
 from app.routers.zendesk import zendesk_guide
-from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
+from app.utils.gpt import (
+    get_similarities,
+    generate_context_array,
+    generate_gpt_chat_response,
+    continue_chat_response,
+)
 from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
 
@@ -47,12 +52,14 @@ api.add_middleware(
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"])
-api.include_router(zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"])
+api.include_router(
+    zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"]
+)
 
 
 @api.on_event("startup")
 async def startup():
-    await prisma.connect()
+    # await prisma.connect()
 
 
 @api.on_event("shutdown")
@@ -74,7 +81,9 @@ def get_cwd():
 async def chat(payload: ChatPayload):
     pprint(payload)
     # download knowledge base embeddings from csv
-    knowledge_base = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
+    knowledge_base = get_dataframe_from_csv(
+        f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv"
+    )
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
     similarities = await get_similarities(payload.query, knowledge_base, "csv")
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
@@ -84,13 +93,17 @@ async def chat(payload: ChatPayload):
     # check if the query is the first question of the conversation
     if len(payload.history):
         # check if the message from user was a question or not
-        is_question = '?' in payload.query
-        response, messages = await continue_chat_response(payload.query, context, payload.history, is_question)
+        is_question = "?" in payload.query
+        response, messages = await continue_chat_response(
+            payload.query, context, payload.history, is_question
+        )
     else:
-        response, messages = await generate_gpt_chat_response(payload.query, context, payload.name)
+        response, messages = await generate_gpt_chat_response(
+            payload.query, context, payload.name
+        )
     print(response)
     return {"reply": response, "messages": messages}
 
 
-if __name__ == '__main__':
-    uvicorn.run("__main__:api", port=8080, host='127.0.0.1', reload=True)
+if __name__ == "__main__":
+    uvicorn.run("__main__:api", port=8080, host="127.0.0.1", reload=True)
