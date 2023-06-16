@@ -14,14 +14,12 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
-from app.db.crud import get_zendesk, get_slack_by_team_id
-from app.db.database import SessionLocal
+from app.db.prisma_client import prisma
 from app.utils.gpt import send_zendesk_ticket
 from app.utils.helpers import border_line
 from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id, fetch_access_token
 from app.utils.types import Profile
 
-db = SessionLocal()
 router = APIRouter()
 
 SLACK_APP_TOKEN = os.environ['SLACK_APP_TOKEN']
@@ -47,7 +45,7 @@ async def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
     # fetch the user's ID
     user_id = body["user"]["id"]
     pprint(body)
-    token = await fetch_access_token(body["team"]["id"], db, logging.Logger)
+    token = await fetch_access_token(body["team"]["id"], logging.Logger)
     client = WebClient(token=token)
     profile = get_profile_from_id(user_id, client)
     conversation = client.conversations_history(channel=body["channel"]["id"], limit=3)
@@ -135,9 +133,9 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
             text="Ok, hold on while I create your Zendesk support ticket for you",
         )
         # fetch user from the DB
-        slack = get_slack_by_team_id(db=db, team_id=body["team"]["id"])
+        slack = await prisma.slack.find_first(where={"team_id": body["team"]["id"]})
         # fetch zendesk config for the user in DB
-        zendesk = get_zendesk(db=db, user_id=slack.user_id)
+        zendesk = await prisma.zendesk.find_first(where={"user_id": slack.user_id})
         # Create a Zendesk support ticket using the data from the action payload
         ticket = await send_zendesk_ticket(last_message, profile, zendesk)
         if ticket:

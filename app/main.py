@@ -13,8 +13,7 @@ from app.db.prisma_client import prisma
 from app.routers.slack import events, interactions, oauth
 from app.routers.zendesk import zendesk_guide
 from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
-from app.utils.helpers import get_dataframe_from_csv, get_vector_embeddings_from_pinecone
-from app.utils.slack import get_db
+from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
 
 logging.basicConfig(
@@ -48,9 +47,7 @@ api.add_middleware(
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"])
-api.include_router(
-    zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"], dependencies=[Depends(get_db)]
-)
+api.include_router(zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"])
 
 
 @api.on_event("startup")

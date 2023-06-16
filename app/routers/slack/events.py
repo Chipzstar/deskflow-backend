@@ -3,7 +3,7 @@ import logging
 import os
 from pprint import pprint
 from typing import Callable, Literal
-
+from app.db.prisma_client import prisma
 from fastapi import APIRouter, Request
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.app.async_app import AsyncApp
@@ -13,8 +13,6 @@ from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
-from app.db.crud import get_slack_by_team_id, get_user, get_zendesk
-from app.db.database import SessionLocal
 from app.redis.client import Redis
 from app.redis.utils import cache_conversation
 from app.utils.gpt import (
@@ -53,11 +51,14 @@ app = AsyncApp(oauth_settings=oauth_settings, signing_secret=SLACK_SIGNING_SECRE
 app_handler = AsyncSlackRequestHandler(app)
 
 
-async def generate_reply(db: SessionLocal, event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
+async def generate_reply(event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
     pprint(event)
     # fetch slack + user info from DB
-    slack = get_slack_by_team_id(db=db, team_id=event["team"])
-    user = get_user(db=db, user_id=slack.user_id)
+    slack = await prisma.slack.find_first(where={"team_id": event["team"]})
+    if slack is None:
+        logger.error(f"Slack not found for team {event['team']}")
+        return "", None, [], None
+    user = await prisma.user.find_unique(where={"user_id": slack.user_id})
     logger.debug(user)
     history = []
     thread_ts = event.get("thread_ts", None)
@@ -159,18 +160,17 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
     print("app_mention event:")
     event = body["event"]
     logger.debug(event)
-    db = SessionLocal()
-    token = await fetch_access_token(body["authorizations"][0]["team_id"], db, logger)
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], logger)
     client = WebClient(token=token)
     # Check if the message was made in the main channel (outside thread)
     if not event.get("thread_ts", None):
         thread_ts = event.get("thread_ts", None) or event["ts"]
-        reply, response, history, user = await generate_reply(db, event, client, logger)
+        reply, response, history, user = await generate_reply(event, client, logger)
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
             # fetch zendesk config for the user in DB
-            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+            zendesk = await prisma.zendesk.find_first(where={"user_id": user.clerk_id})
             await send_zendesk_ticket(reply, profile, zendesk)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
@@ -185,18 +185,17 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
     event = body["event"]
     logger.debug(event)
     thread_ts = event.get("thread_ts", None)
-    db = SessionLocal()
-    token = await fetch_access_token(body["authorizations"][0]["team_id"], db, logger)
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], logger)
     client = WebClient(token=token)
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
-        reply, response, history, user = await generate_reply(db, event, client, logger, bool(thread_ts))
+        reply, response, history, user = await generate_reply(event, client, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             slack_profile = get_profile_from_id(event['user'], client)
             # fetch zendesk config for the user in DB
-            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+            zendesk = await prisma.zendesk.find_first(where={"user_id": user.clerk_id})
             if zendesk:
                 await send_zendesk_ticket(reply, slack_profile, zendesk)
             else:
@@ -218,12 +217,12 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
         is_mentioned = await check_bot_mentioned_in_thread(token, event['channel'], thread_ts, client)
         if is_mentioned:
             # extract message from event
-            reply, response, history, user = await generate_reply(db, event, client, logger)
+            reply, response, history, user = await generate_reply(event, client, logger)
             # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
             if check_can_create_ticket(reply, history):
                 slack_profile = get_profile_from_id(event['user'], client)
                 # fetch zendesk config for the user in DB
-                zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+                zendesk = await prisma.zendesk.find_first(where={"user_id": user.clerk_id})
                 if zendesk:
                     await send_zendesk_ticket(reply, slack_profile, zendesk)
                 else:

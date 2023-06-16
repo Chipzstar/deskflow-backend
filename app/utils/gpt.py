@@ -9,8 +9,8 @@ import pandas as pd
 import tiktoken
 import urllib3
 from openai.embeddings_utils import cosine_similarity, get_embedding
+from prisma.models import Zendesk
 
-from app.db.schemas import Zendesk
 from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
 from app.utils.types import Message, Profile, ZendeskOAuthCredentials
 
