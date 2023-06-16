@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, relationship
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, Enum
+from sqlalchemy.orm import relationship, backref
 
 from .database import Base
 
@@ -53,8 +54,7 @@ class Zendesk(Base):
 
 
 class Issue(Base):
-    __tablename__ = 'issue'
-
+    __tablename__ = 'Issue'
     id = Column(Integer, primary_key=True, autoincrement=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
