@@ -1,0 +1,124 @@
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  recursive_type_depth = 5
+}
+
+enum IssueStatus {
+  open
+  resolved
+  unresolved
+  closed
+}
+
+enum IssueCategory {
+  leave_policy
+  password_reset
+  benefits_info
+  hardware_issue
+  payroll_info
+  software_issue
+  onboarding_offboarding
+}
+
+enum CommunicationChannel {
+  slack
+  teams
+  gmail
+  zoom
+  yammer
+}
+
+model Issue {
+  id             Int                  @id @default(autoincrement())
+  created_at     DateTime             @default(now())
+  updated_at     DateTime             @updatedAt
+  user_id        String
+  user           User                 @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
+  org_name       String               @default("")
+  channel        CommunicationChannel
+  org_id         String
+  organization   Organization         @relation(fields: [org_id], references: [clerk_id], onDelete: Cascade)
+  employee_id    String
+  employee_name  String               @default("")
+  employee_email String               @default("")
+  category       IssueCategory
+  messageHistory String
+  status         IssueStatus
+  is_satisfied   Boolean
+  reason         String?
+
+  @@index([user_id])
+  @@index([org_id])
+}
+
+model Organization {
+  id         Int      @id @default(autoincrement())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  clerk_id   String   @unique
+  name       String   @default("")
+  slug       String   @default("")
+  users      User[]
+  issues     Issue[]
+}
+
+model Slack {
+  id               Int      @id @default(autoincrement())
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  user_id          String   @unique
+  user             User     @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
+  access_token     String   @default("")
+  team_id          String   @default("")
+  team_name        String   @default("")
+  bot_id           String   @default("")
+  bot_access_token String   @default("")
+  scopes           String   @default("")
+
+  @@index([user_id])
+}
+
+model User {
+  id                     Int          @id @default(autoincrement())
+  created_at             DateTime     @default(now())
+  updated_at             DateTime     @updatedAt
+  clerk_id               String       @unique
+  organization_id        String       @default("")
+  email                  String       @unique
+  firstname              String
+  lastname               String
+  fullname               String
+  stripe_customer_id     String?
+  stripe_payment_method  String?
+  stripe_subscription_id String?
+  slack_auth_state_id    String       @default("")
+  zendesk_auth_state_id  String       @default("")
+  slack                  Slack?
+  zendesk                Zendesk?
+  organization           Organization @relation(fields: [organization_id], references: [clerk_id], onDelete: Cascade)
+  Issue                  Issue[]
+
+  @@index([organization_id])
+}
+
+model Zendesk {
+  id            Int      @id @default(autoincrement())
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  user_id       String   @unique
+  user          User     @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
+  access_token  String
+  subdomain     String   @unique
+  account_email String   @default("")
+  account_id    String   @default("")
+  guide         Boolean  @default(false)
+  support       Boolean  @default(false)
+
+  @@index([user_id, subdomain])
+}

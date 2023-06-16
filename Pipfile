@@ -42,6 +42,7 @@ sqlalchemy = "*"
 mysqlclient = "*"
 sqlacodegen = "*"
 jupyterlab = "*"
+prisma = "*"
 
 [dev-packages]
 

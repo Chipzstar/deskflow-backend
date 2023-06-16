@@ -30,7 +30,7 @@ defusedxml==0.7.1 ; python_version >= '2.7' and python_version not in '3.0, 3.1,
 dill==0.3.6 ; python_version >= '3.11'
 dnspython==2.3.0 ; python_version >= '3.7' and python_version < '4.0'
 executing==1.2.0
-fastapi==0.96.0
+fastapi~=0.97.0
 fastjsonschema==2.17.1
 fonttools==4.39.4 ; python_version >= '3.8'
 fqdn==1.5.1
@@ -174,3 +174,5 @@ pydantic~=1.10.8
 requests~=2.31.0
 beautifulsoup4~=4.12.2
 starlette~=0.27.0
+prisma~=0.9.0
+urllib3~=2.0.3

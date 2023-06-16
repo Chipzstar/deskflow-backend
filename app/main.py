@@ -9,8 +9,7 @@ from pprint import pprint
 import uvicorn
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-
-from app.db import crud, database
+from app.db.prisma_client import prisma
 from app.routers.slack import events, interactions, oauth
 from app.routers.zendesk import zendesk_guide
 from app.utils.gpt import get_similarities, generate_context_array, generate_gpt_chat_response, continue_chat_response
@@ -35,7 +34,7 @@ origins = [
     "https://deskflow-app.vercel.app/",
     "https://deskflow-app-git-dev-deskflow.vercel.app",
     "https://dev.deskflow.ai",
-    "https://app.deskflow.ai"
+    "https://app.deskflow.ai",
 ]
 
 api.add_middleware(
@@ -48,10 +47,20 @@ api.add_middleware(
 
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
-api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"], dependencies=[Depends(get_db)])
+api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"])
 api.include_router(
     zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"], dependencies=[Depends(get_db)]
 )
+
+
+@api.on_event("startup")
+async def startup():
+    await prisma.connect()
+
+
+@api.on_event("shutdown")
+async def shutdown():
+    await prisma.disconnect()
 
 
 @api.get("/")
