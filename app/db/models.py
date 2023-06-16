@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, relationship
 
 from .database import Base
 
@@ -9,6 +9,7 @@ class User(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, onupdate=func.now(), default=func.now())
     clerk_id = Column(String, unique=True, index=True)
+    organization_id = Column(String, default="")
     email = Column(String, unique=True, index=True)
     firstname = Column(String, default=True)
     lastname = Column(String, default=True)
@@ -18,6 +19,9 @@ class User(Base):
     stripe_payment_method = Column(String, default=True)
     slack_auth_state_id = Column(String, default=True)
     zendesk_auth_state_id = Column(String, default=True)
+    slack = relationship("Slack", backref=backref("user"))
+    zendesk = relationship("Zendesk", backref=backref("user"))
+    organization = relationship("Organization", backref=backref("users"))
 
 
 class Slack(Base):
@@ -46,3 +50,25 @@ class Zendesk(Base):
     account_id = Column(String, default="")
     guide = Column(Boolean, default=False)
     support = Column(Boolean, default=False)
+
+
+class Issue(Base):
+    __tablename__ = 'issue'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    user_id = Column(String)
+    org_name = Column(String, default="")
+    channel = Column(Enum('slack', 'teams', 'gmail', 'zoom', 'yammer'))
+    org_id = Column(String)
+    employee_id = Column(String)
+    employee_name = Column(String, default="")
+    employee_email = Column(String, default="")
+    category = Column(Enum('leave_policy', 'password_reset', 'benefits_info', 'hardware_issue', 'payroll_info', 'software_issue', 'onboarding_offboarding'))
+    messageHistory = Column(String)
+    status = Column(Enum('open', 'resolved', 'unresolved', 'closed'))
+    is_satisfied = Column(Boolean)
+    reason = Column(String)
+    user = relationship("User", backref=backref("issues"))
+    organization = relationship("Organization", backref=backref("issues"))

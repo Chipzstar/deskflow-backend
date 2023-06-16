@@ -108,6 +108,8 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
         is_question = '?' in message
         reply, messages = await continue_chat_response(message, context, history, is_question)
     else:
+        # create reference to the start of the issue in the DB
+        
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
     print(f"\nREPLY: {reply}")
     response = client.chat_update(channel=event["channel"], ts=to_replace['message']['ts'], text=reply)

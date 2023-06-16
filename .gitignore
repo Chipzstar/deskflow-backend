@@ -1,7 +1,6 @@
-.idea
 wandb
+.idea/
 /wandb/
-/.idea/
 Pipfile.lock
 .fleet
 .ipynb_checkpoints/
