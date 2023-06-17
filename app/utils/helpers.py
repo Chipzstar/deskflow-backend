@@ -9,8 +9,13 @@ ONE_DAY_IN_SECONDS = 60 * 60 * 24
 ONE_HOUR_IN_SECONDS = 60 * 60
 
 
-def border_asterisk():
-    print("* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *")
+def border_asterisk(message: str | None = None):
+    if message is None:
+        print("* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *")
+    else:
+        print("* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *")
+        print(f"{message}")
+        print("* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *")
 
 
 def border_line():

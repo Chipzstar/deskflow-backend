@@ -27,6 +27,7 @@ from app.utils.helpers import (
     check_reply_requires_action,
     check_can_create_ticket,
     get_vector_embeddings_from_pinecone,
+    border_asterisk,
 )
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
 
@@ -58,7 +59,7 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
     if slack is None:
         logger.error(f"Slack not found for team {event['team']}")
         return "", None, [], None
-    user = await prisma.user.find_unique(where={"user_id": slack.user_id})
+    user = await prisma.user.find_unique(where={"clerk_id": slack.user_id})
     logger.debug(user)
     history = []
     thread_ts = event.get("thread_ts", None)
@@ -110,7 +111,7 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
         reply, messages = await continue_chat_response(message, context, history, is_question)
     else:
         # create reference to the start of the issue in the DB
-        
+
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
     print(f"\nREPLY: {reply}")
     response = client.chat_update(channel=event["channel"], ts=to_replace['message']['ts'], text=reply)
@@ -186,6 +187,7 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
     logger.debug(event)
     thread_ts = event.get("thread_ts", None)
     token = await fetch_access_token(body["authorizations"][0]["team_id"], logger)
+    border_asterisk(token)
     client = WebClient(token=token)
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":

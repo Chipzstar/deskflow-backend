@@ -52,19 +52,17 @@ api.add_middleware(
 api.include_router(events.router, prefix="/slack", tags=["slack", "events"])
 api.include_router(interactions.router, prefix="/slack", tags=["slack", "interactions"])
 api.include_router(oauth.router, prefix="/slack", tags=["slack", "oauth"])
-api.include_router(
-    zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"]
-)
+api.include_router(zendesk_guide.router, prefix="/zendesk", tags=["zendesk", "knowledge-base"])
 
 
-# @api.on_event("startup")
-# async def startup():
-#     await prisma.connect()
-#
-#
-# @api.on_event("shutdown")
-# async def shutdown():
-#     await prisma.disconnect()
+@api.on_event("startup")
+async def startup():
+    await prisma.connect()
+
+
+@api.on_event("shutdown")
+async def shutdown():
+    await prisma.disconnect()
 
 
 @api.get("/")
@@ -81,9 +79,7 @@ def get_cwd():
 async def chat(payload: ChatPayload):
     pprint(payload)
     # download knowledge base embeddings from csv
-    knowledge_base = get_dataframe_from_csv(
-        f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv"
-    )
+    knowledge_base = get_dataframe_from_csv(f"{os.getcwd()}/app/data", "zendesk_vector_embeddings.csv")
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
     similarities = await get_similarities(payload.query, knowledge_base, "csv")
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
@@ -94,13 +90,9 @@ async def chat(payload: ChatPayload):
     if len(payload.history):
         # check if the message from user was a question or not
         is_question = "?" in payload.query
-        response, messages = await continue_chat_response(
-            payload.query, context, payload.history, is_question
-        )
+        response, messages = await continue_chat_response(payload.query, context, payload.history, is_question)
     else:
-        response, messages = await generate_gpt_chat_response(
-            payload.query, context, payload.name
-        )
+        response, messages = await generate_gpt_chat_response(payload.query, context, payload.name)
     print(response)
     return {"reply": response, "messages": messages}
 

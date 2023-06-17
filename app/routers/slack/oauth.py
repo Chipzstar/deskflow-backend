@@ -99,6 +99,15 @@ async def oauth_callback(payload: OAuthPayload):
                         "scopes": oauth_response.get("scope"),
                     }
                 )
+            else:
+                slack = await prisma.slack.update(
+                    where={"user_id": user.clerk_id},
+                    data={
+                        "access_token": bot_token,
+                        "team_id": installed_team.get("id"),
+                        "team_name": installed_team.get("name"),
+                    },
+                )
             return {"status": "Success", "message": "Thanks for installing Alfred!", "slack": slack}
         else:
             raise HTTPException(
