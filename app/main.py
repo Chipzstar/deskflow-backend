@@ -57,14 +57,14 @@ api.include_router(
 )
 
 
-@api.on_event("startup")
-async def startup():
-    # await prisma.connect()
-
-
-@api.on_event("shutdown")
-async def shutdown():
-    await prisma.disconnect()
+# @api.on_event("startup")
+# async def startup():
+#     await prisma.connect()
+#
+#
+# @api.on_event("shutdown")
+# async def shutdown():
+#     await prisma.disconnect()
 
 
 @api.get("/")
