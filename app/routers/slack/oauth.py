@@ -5,7 +5,6 @@ from typing import Tuple
 from fastapi import APIRouter, HTTPException, Depends
 from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore, Installation
-from sqlalchemy.orm import Session
 from app.db.prisma_client import prisma
 from prisma.models import User
 from app.utils.types import OAuthPayload

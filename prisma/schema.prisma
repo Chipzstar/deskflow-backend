@@ -48,7 +48,7 @@ model Issue {
   employee_name  String               @default("")
   employee_email String               @default("")
   category       IssueCategory
-  messageHistory String
+  messageHistory String               @db.LongText
   status         IssueStatus
   is_satisfied   Boolean
   reason         String?

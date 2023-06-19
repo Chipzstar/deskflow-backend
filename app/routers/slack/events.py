@@ -60,6 +60,8 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
         logger.error(f"Slack not found for team {event['team']}")
         return "", None, [], None
     user = await prisma.user.find_unique(where={"clerk_id": slack.user_id})
+    org = await prisma.organization.find_unique(where={"clerk_id": user.organization_id})
+    slack_profile = get_profile_from_id(event["user"], client)
     logger.debug(user)
     history = []
     thread_ts = event.get("thread_ts", None)
@@ -82,7 +84,7 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
         if byte_result:
             str_result = str(byte_result, encoding='utf-8')
             history = json.loads(str_result)
-    # check if the message was made inside alfred jnr chat message tab
+    # check if the message was made inside alfred chat message tab
     elif str(event["channel"]).startswith("D"):
         conversation_id = f"{bot_id}:{event['channel']}"
         r = Redis()
@@ -110,9 +112,22 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
         is_question = '?' in message
         reply, messages = await continue_chat_response(message, context, history, is_question)
     else:
-        # create reference to the start of the issue in the DB
-
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
+        # create reference to the start of the issue in the DB
+        issue = await prisma.issue.create(data={
+            "user_id": user.clerk_id,
+            "org_id": org.clerk_id,
+            "org_name": org.name,
+            "channel": "slack",
+            "employee_id": event["user"],
+            "employee_name": slack_profile.name,
+            "employee_email": slack_profile.email,
+            "category": "software_issue",
+            "messageHistory": str(messages),
+            "status": "open",
+            "is_satisfied": False
+        })
+        border_asterisk(issue)
     print(f"\nREPLY: {reply}")
     response = client.chat_update(channel=event["channel"], ts=to_replace['message']['ts'], text=reply)
     logger.debug(response.data)
@@ -127,7 +142,7 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
     # if the message was made in a group channel where the bot is mentioned
     else:
         channel_type = "CHANNEL_MENTION_REPLY"
-    result = cache_conversation(channel_type, response.data, client, messages)
+    cache_conversation(channel_type, response.data, client, messages)
     return reply, response.data, messages, user
 
 
@@ -187,7 +202,6 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
     logger.debug(event)
     thread_ts = event.get("thread_ts", None)
     token = await fetch_access_token(body["authorizations"][0]["team_id"], logger)
-    border_asterisk(token)
     client = WebClient(token=token)
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":

@@ -139,9 +139,6 @@ async def fetch_access_token(team_id: str, logger):
     if not team_id:
         return None
     slack_config = await prisma.slack.find_first(where={"team_id": team_id})
-    border_asterisk()
-    print(slack_config.access_token)
-    border_asterisk()
     if not slack_config:
         logger.error(f"Slack config not found for team_id: {team_id}")
         return

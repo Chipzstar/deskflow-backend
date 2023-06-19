@@ -38,6 +38,7 @@ python-dotenv = "*"
 redis = "*"
 jupyterlab = "*"
 prisma = "*"
+pyright = "*"
 
 [dev-packages]
 

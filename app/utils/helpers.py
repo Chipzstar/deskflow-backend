@@ -126,13 +126,14 @@ def convert_csv_embeddings_to_floats(embeddings: str) -> list[float]:
 
 def check_reply_requires_action(reply: str, messages: List[Dict[str, str]]):
     is_knowledge_gap = "information is not provided within the company’s knowledge base"
-    is_zendesk_ticket = "create a ticket on Zendesk"
+    is_zendesk_ticket_a = "create a ticket on Zendesk"
+    is_zendesk_ticket_b = "create a Zendesk ticket"
     is_contact_support = "ask HR/IT"
-    hints = [is_knowledge_gap, is_zendesk_ticket, is_contact_support]
-    if (is_zendesk_ticket.lower() in reply.lower()) or (is_contact_support.lower() in reply.lower()):
-        return True
-    else:
-        return False
+    hints = [is_knowledge_gap, is_zendesk_ticket_a, is_zendesk_ticket_b, is_contact_support]
+    for hint in hints:
+        if hint.lower() in reply.lower():
+            return True
+    return False
 
 
 def check_can_create_ticket(reply: str, messages: List[Dict[str, str]]):
