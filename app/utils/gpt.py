@@ -155,13 +155,11 @@ async def generate_gpt_chat_response(
     question: str,
     context: str,
     sender_name: str = "Ola",
-    company: str = "Omnicentra",
-    system_message: str = f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at "
-    f"Omnicentra",
+    company: str = "Omnicentra"
 ):
     message = query_message(question, context, company, MAX_INPUT_TOKENS, sender_name)
     messages = [
-        {"role": "system", "content": system_message},
+        {"role": "system", "content": f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at {company}"},
         {"role": "user", "content": message},
     ]
     response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)

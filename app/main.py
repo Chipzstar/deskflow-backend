@@ -92,7 +92,7 @@ async def chat(payload: ChatPayload):
         is_question = "?" in payload.query
         response, messages = await continue_chat_response(payload.query, context, payload.history, is_question)
     else:
-        response, messages = await generate_gpt_chat_response(payload.query, context, payload.name)
+        response, messages = await generate_gpt_chat_response(payload.query, context, payload.name, payload.company)
     print(response)
     return {"reply": response, "messages": messages}
 
