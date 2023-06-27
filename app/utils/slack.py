@@ -65,12 +65,44 @@ async def display_support_dialog(client: WebClient, response):
         "style": "danger",
         "action_id": "contact_support"
     }
-    # Create a message block containing the header and buttons
-    header = SectionBlock(
-        text="Create Zendesk Support Ticket"
-    )
     buttons = ActionsBlock(
         elements=[create_ticket_pointer, cancel_pointer]
+    )
+    divider = DividerBlock()
+    block = [divider, buttons]
+    # Post a message to a user using the interactivity pointer
+    try:
+        response = client.chat_postMessage(channel=response['channel'], text="New message", blocks=block)
+        print(response)
+    except SlackApiError as e:
+        print("Error posting message: {}".format(e))
+
+
+async def issue_resolved_dialog(client: WebClient, response):
+    # Define the interactive message
+    # Create an interactivity pointer for the "Create ticket" button
+    resolved_pointer = {
+        "type": "button",
+        "text": {
+            "type": "plain_text",
+            "text": "Yes"
+        },
+        "style": "primary",
+        "action_id": "resolved_success"
+    }
+
+    # Create an interactivity pointer for the "Cancel" button
+    not_resolved_pointer = {
+        "type": "button",
+        "text": {
+            "type": "plain_text",
+            "text": "No"
+        },
+        "style": "danger",
+        "action_id": "resolved_failure"
+    }
+    buttons = ActionsBlock(
+        elements=[resolved_pointer, not_resolved_pointer]
     )
     divider = DividerBlock()
     block = [divider, buttons]

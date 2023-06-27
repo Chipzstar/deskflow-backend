@@ -20,7 +20,7 @@ from app.utils.gpt import (
     generate_context_array,
     continue_chat_response,
     generate_gpt_chat_response,
-    send_zendesk_ticket,
+    send_zendesk_ticket, classify_issue,
 )
 from app.utils.helpers import (
     remove_custom_delimiters,
@@ -122,7 +122,7 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
             "employee_id": event["user"],
             "employee_name": slack_profile.name,
             "employee_email": slack_profile.email,
-            "category": "software_issue",
+            "category": classify_issue(message),
             "messageHistory": str(messages),
             "status": "open",
             "is_satisfied": False
