@@ -10,6 +10,8 @@ reqs = "cmd /C 'pipenv requirements > requirements.txt'"
 env-sync = "cmd /C 'doppler secrets download --no-file --format env > .env'"
 reqs-unix = "sh -c 'pipenv requirements > requirements.txt'"
 env-sync-unix = "sh -c 'doppler secrets download --no-file --format env > .env'"
+celery-logs = "sh -c 'celery -A app.worker worker --loglevel=info --logfile=logs/celery.log'"
+flower = "sh -c 'celery -A app.worker --broker=redis://localhost:6379/0 flower --port=5555'"
 
 [packages]
 openai = "*"
@@ -39,6 +41,8 @@ redis = "*"
 jupyterlab = "*"
 prisma = "*"
 pyright = "*"
+celery = "*"
+flower = "*"
 
 [dev-packages]
 

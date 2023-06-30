@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pprint import pprint
 from typing import Literal, List, Dict
@@ -8,6 +9,17 @@ from slack_sdk import WebClient
 from app.redis.client import Redis
 from app.utils.helpers import ONE_DAY_IN_SECONDS, ONE_HOUR_IN_SECONDS
 from app.utils.slack import get_conversation_id
+from app.worker import create_task
+
+
+async def on_conversation_expired(conversation_id: str, ttl: int):
+    await asyncio.sleep(ttl)
+    r = Redis()
+    try:
+        convo = await r.get_value(conversation_id)
+        print(convo)
+    except (ResponseError, RedisError):
+        pass
 
 
 def cache_conversation(
@@ -29,6 +41,9 @@ def cache_conversation(
             r = Redis()
             # Cache the message in Redis using the message ID as the key, TTL = 1 day
             r.add_to_cache(conversation_id, json.dumps(history), ONE_DAY_IN_SECONDS)
+            # schedule a worker job to send a message to the user that the conversation is now finished after the
+            # cache expires
+            create_task.delay(conversation_id, 60)
         else:
             for message in history:
                 print(message)
@@ -38,6 +53,9 @@ def cache_conversation(
             r = Redis()
             # Cache the message in Redis using the message ID as the key, TTL = 1 hour
             r.add_to_cache(conversation_id, json.dumps(history), ONE_HOUR_IN_SECONDS)
+            # schedule a worker job to send a message to the user that the conversation is now finished after the
+            # cache expires
+            create_task.delay(conversation_id, ONE_HOUR_IN_SECONDS)
         return "Success"
     except ResponseError as e:
         print(f"Response Error: {e}")

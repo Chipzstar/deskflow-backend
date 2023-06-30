@@ -7,7 +7,8 @@ import os
 from pprint import pprint
 
 import uvicorn
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Body
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.prisma_client import prisma
 from app.routers.slack import events, interactions, oauth
@@ -20,13 +21,14 @@ from app.utils.gpt import (
 )
 from app.utils.helpers import get_dataframe_from_csv
 from app.utils.types import ChatPayload
+from celery.result import AsyncResult
+import app.worker as worker
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-
 
 api = FastAPI()
 
@@ -73,6 +75,23 @@ def hello_world():
 @api.get("/cwd")
 def get_cwd():
     return {"cwd": os.getcwd()}
+
+
+@api.post("/tasks", status_code=201)
+def run_task(payload=Body(...)):
+    task = worker.create_task.delay(payload["id"], payload["ttl"])
+    return JSONResponse({"task_id": task.id, "convo_id": payload["id"]})
+
+
+@api.get("/tasks/{task_id}")
+def get_status(task_id):
+    task_result = AsyncResult(task_id)
+    result = {
+        "task_id": task_id,
+        "task_status": task_result.status,
+        "task_result": task_result.result
+    }
+    return JSONResponse(result)
 
 
 @api.post("/api/v1/generate-chat-response")
