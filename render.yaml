@@ -2,60 +2,32 @@ services:
   # A Docker web service
   - type: web
     name: fastapi
-    runtime: docker
+    runtime: python
     repo: https://github.com/Chipzstar/DeskflowGPTBackend.git # optional
     region: frankfurt # optional (defaults to oregon)
     plan: starter # optional (defaults to starter instance type)
     branch: alfred-query-issue-tracking # optional (defaults to master)
-    dockerCommand: ./run.sh # optional (defaults to Dockerfile command)
+    dockerCommand: uvicorn app.main:api --host 0.0.0.0 --port $PORT # optional (defaults to Dockerfile command)
     numInstances: 1 # optional (defaults to 1)
     healthCheckPath: /
     envVars:
       - key: REDIS_HOST
         fromService:
           type: redis
-          name: lightning
+          name: my_redis
           property: host # available properties are listed below
       - key: REDIS_PORT
         fromService:
           type: redis
           name: lightning
           property: port
-      - fromGroup: conc-settings
+      - fromGroup: DeskflowAPI Dev
   # A Redis instance
   - type: redis
-    name: redis
+    name: my_redis
     region: frankfurt
     ipAllowList: # required
       - source: 0.0.0.0/0
         description: everywhere
     plan: starter # optional (defaults to starter instance type)
     maxmemoryPolicy: allkeys-lru # optional (defaults to allkeys-lru)
-
-databases:
-  - name: elephant
-    databaseName: mydb # optional (Render may add a suffix)
-    user: adrian # optional
-    ipAllowList: # optional (defaults to allow all)
-      - source: 203.0.113.4/30
-        description: office
-      - source: 198.51.100.1
-        description: home
-  - name: private database
-    databaseName: private
-    ipAllowList: [] # only allow internal connections
-
-
-envVarGroups:
-  - name: conc-settings
-    envVars:
-      - key: CONCURRENCY
-        value: 2
-      - key: SECRET
-        generateValue: true
-      - key: USER_PROVIDED_SECRET
-        sync: false
-  - name: stripe
-    envVars:
-      - key: STRIPE_API_URL
-        value: https://api.stripe.com/v2
