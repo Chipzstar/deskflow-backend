@@ -18,8 +18,13 @@ celery.flower_unauthenticated_api = True
 
 
 @celery.task()
-def create_task(convo_id, ttl):
-    time.sleep(ttl)
+def adding_task(x, y):
+    return x + y
+
+
+@celery.task()
+def create_task(convo_id, ttl, debug=False):
+    time.sleep(30 if debug else ttl)
     r = Redis()
     try:
         convo = r.get_value(convo_id)

@@ -39,6 +39,8 @@ model Issue {
   created_at     DateTime             @default(now())
   updated_at     DateTime             @updatedAt
   resolved_at    DateTime?
+  issue_id       String               @unique
+  celery_task_id String
   user_id        String
   user           User                 @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
   org_name       String               @default("")

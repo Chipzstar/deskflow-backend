@@ -4,4 +4,7 @@ wandb
 Pipfile.lock
 .fleet
 .ipynb_checkpoints/
+
+# App ignores
+docker-compose.override.yml
 .env

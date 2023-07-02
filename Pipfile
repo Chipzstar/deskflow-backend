@@ -10,8 +10,10 @@ reqs = "cmd /C 'pipenv requirements > requirements.txt'"
 env-sync = "cmd /C 'doppler secrets download --no-file --format env > .env'"
 reqs-unix = "sh -c 'pipenv requirements > requirements.txt'"
 env-sync-unix = "sh -c 'doppler secrets download --no-file --format env > .env'"
-celery-logs = "sh -c 'celery -A app.worker worker --loglevel=info --logfile=logs/celery.log'"
+celery = "sh -c 'celery -A app.worker worker --loglevel=info --logfile=app/logs/celery.log'"
 flower = "sh -c 'celery -A app.worker --broker=redis://localhost:6379/0 flower --port=5555'"
+doppler-ephemeral-token = "sh -c 'export DOPPLER_TOKEN=\"$(doppler configs tokens create dev --plain --max-age 1m)\"'"
+doppler-service-token = "sh -c 'export DOPPLER_SERVICE_TOKEN=\"$(doppler configs tokens create --project deskflow-backend --config dev worker-dev-token --plain --max-age 1m)\"'"
 
 [packages]
 openai = "*"
@@ -43,6 +45,7 @@ prisma = "*"
 pyright = "*"
 celery = "*"
 flower = "*"
+pytest = "*"
 
 [dev-packages]
 

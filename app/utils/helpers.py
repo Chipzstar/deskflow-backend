@@ -6,6 +6,7 @@ from app.pinecone.client import Pinecone
 import pandas as pd
 
 ONE_DAY_IN_SECONDS = 60 * 60 * 24
+TWO_DAYS_IN_SECONDS = 60 * 60 * 24 * 2
 ONE_HOUR_IN_SECONDS = 60 * 60
 
 

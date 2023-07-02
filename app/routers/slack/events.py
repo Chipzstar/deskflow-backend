@@ -3,6 +3,10 @@ import logging
 import os
 from pprint import pprint
 from typing import Callable, Literal
+
+from celery.result import AsyncResult
+from celery.worker.control import revoke
+
 from app.db.prisma_client import prisma
 from fastapi import APIRouter, Request
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
@@ -26,8 +30,7 @@ from app.utils.helpers import (
     remove_custom_delimiters,
     check_reply_requires_action,
     check_can_create_ticket,
-    get_vector_embeddings_from_pinecone,
-    border_asterisk,
+    get_vector_embeddings_from_pinecone
 )
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
 
@@ -113,21 +116,6 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
         reply, messages = await continue_chat_response(message, context, history, is_question)
     else:
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
-        # create reference to the start of the issue in the DB
-        issue = await prisma.issue.create(data={
-            "user_id": user.clerk_id,
-            "org_id": org.clerk_id,
-            "org_name": org.name,
-            "channel": "slack",
-            "employee_id": event["user"],
-            "employee_name": slack_profile.name,
-            "employee_email": slack_profile.email,
-            "category": classify_issue(message),
-            "messageHistory": str(messages),
-            "status": "open",
-            "is_satisfied": False
-        })
-        border_asterisk(issue)
     print(f"\nREPLY: {reply}")
     response = client.chat_update(channel=event["channel"], ts=to_replace['message']['ts'], text=reply)
     logger.debug(response.data)
@@ -142,7 +130,46 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
     # if the message was made in a group channel where the bot is mentioned
     else:
         channel_type = "CHANNEL_MENTION_REPLY"
-    cache_conversation(channel_type, response.data, client, messages)
+    conversation_id, celery_task_id = cache_conversation(channel_type, response.data, client, messages)
+    # create reference to the start of the issue in the DB or update the issue if already exists
+    if len(history):
+        # fetch the is issue with matching conversation_id
+        issue = await prisma.issue.find_first(where={"issue_id": conversation_id})
+        # revoke the celery task if it exists
+        if issue and issue.celery_task_id:
+            # revoke(state=conversation_id, task_id=issue.celery_task_id, terminate=True, signal="SIGKILL")
+            task = AsyncResult(issue.celery_task_id)
+            task.revoke(terminate=True, signal="SIGKILL")
+        # issue already exists, therefore try to locate issue in DB and update accordingly
+        await prisma.issue.update(
+            where={"issue_id": conversation_id},
+            data={
+                "celery_task_id": celery_task_id,
+                "employee_id": event["user"],
+                "employee_name": slack_profile.name,
+                "employee_email": slack_profile.email,
+                "category": classify_issue(message),
+                "messageHistory": str(messages),
+                "status": "open",
+                "is_satisfied": False
+            }
+        )
+    else:
+        await prisma.issue.create(data={
+            "user_id": user.clerk_id,
+            "issue_id": conversation_id,
+            "celery_task_id": celery_task_id,
+            "org_id": org.clerk_id,
+            "org_name": org.name,
+            "channel": "slack",
+            "employee_id": event["user"],
+            "employee_name": slack_profile.name,
+            "employee_email": slack_profile.email,
+            "category": classify_issue(message),
+            "messageHistory": str(messages),
+            "status": "open",
+            "is_satisfied": False
+        })
     return reply, response.data, messages, user
 
 
