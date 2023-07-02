@@ -3,10 +3,8 @@ services:
   - type: web
     name: fastapi
     runtime: python
-    repo: https://github.com/Chipzstar/DeskflowGPTBackend.git # optional
     region: frankfurt # optional (defaults to oregon)
     plan: starter # optional (defaults to starter instance type)
-    branch: alfred-query-issue-tracking # optional (defaults to master)
     buildCommand: pip install -r requirements.txt && prisma py fetch && prisma py generate
     startCommand: uvicorn app.main:api --host 0.0.0.0 --port $PORT # optional (defaults to Dockerfile command)
     numInstances: 1 # optional (defaults to 1)
