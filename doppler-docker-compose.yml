@@ -18,7 +18,7 @@ services:
 
   worker:
     build: .
-    command: celery -A app.worker worker --loglevel=info --logfile=/code/app/logs/celery.log
+    command: celery -A app.worker worker --loglevel=info --logfile=/code/app/logs/celery.log --uid=celery
     volumes:
       - ./app:/usr/src/app
     environment:

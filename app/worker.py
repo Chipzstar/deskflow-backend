@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import ssl
 import os
 import logging
 import time
@@ -14,6 +15,15 @@ logger = logging.getLogger(__name__)
 celery = Celery(__name__)
 celery.conf.broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379")
 celery.conf.result_backend = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379")
+print(os.environ.get("DOPPLER_ENVIRONMENT"))
+
+if not os.environ.get("DOPPLER_ENVIRONMENT") == "dev":
+    celery.conf.redis_backend_use_ssl = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+    celery.conf.broker_use_ssl = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
 celery.flower_unauthenticated_api = True
 
 
