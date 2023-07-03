@@ -12,8 +12,7 @@ import time
 from celery import Celery
 from redis.exceptions import ResponseError, RedisError
 from app.redis.client import Redis
-from celery.signals import celeryd_init, worker_shutdown, celeryd_after_setup, worker_process_init
-from prisma import Prisma
+from celery.signals import  worker_shutdown, celeryd_after_setup, worker_process_init
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +29,6 @@ if not os.environ.get("DOPPLER_ENVIRONMENT") == "dev":
         'ssl_cert_reqs': ssl.CERT_NONE
     }
 
-
-db = Prisma()
 
 
 @celeryd_after_setup.connect
