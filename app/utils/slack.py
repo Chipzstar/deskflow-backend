@@ -41,7 +41,7 @@ async def display_plain_text_dialog(
         print("Error posting message: {}".format(e))
 
 
-async def display_support_dialog(client: WebClient, response):
+def display_support_dialog(client: WebClient, response):
     print("TAKING ACTION!!!!")
     # Define the interactive message
     # Create an interactivity pointer for the "Create ticket" button

@@ -8,3 +8,5 @@ Pipfile.lock
 # App ignores
 docker-compose.override.yml
 .env
+**/*celery.log
+!**/
