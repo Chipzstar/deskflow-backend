@@ -9,18 +9,6 @@ services:
     startCommand: uvicorn app.main:api --host 0.0.0.0 --port $PORT # optional (defaults to Dockerfile command)
     numInstances: 1 # optional (defaults to 1)
     healthCheckPath: /
-    envVars:
-      - key: REDIS_HOST
-        fromService:
-          type: redis
-          name: my_redis
-          property: host # available properties are listed below
-      - key: REDIS_PORT
-        fromService:
-          type: redis
-          name: my_redis
-          property: port
-      - fromGroup: DeskflowAPI Dev
   # A Redis instance
   - type: redis
     name: my_redis

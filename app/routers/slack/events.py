@@ -5,8 +5,6 @@ from pprint import pprint
 from typing import Callable, Literal
 
 from celery.result import AsyncResult
-from celery.worker.control import revoke
-
 from app.db.prisma_client import prisma
 from fastapi import APIRouter, Request
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
@@ -33,6 +31,7 @@ from app.utils.helpers import (
     get_vector_embeddings_from_pinecone
 )
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
+from app.worker import create_task
 
 router = APIRouter()
 
@@ -55,7 +54,7 @@ app = AsyncApp(oauth_settings=oauth_settings, signing_secret=SLACK_SIGNING_SECRE
 app_handler = AsyncSlackRequestHandler(app)
 
 
-async def generate_reply(event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
+async def generate_reply(event, client: WebClient, token: str, logger: logging.Logger, reply_in_thread=True):
     pprint(event)
     # fetch slack + user info from DB
     slack = await prisma.slack.find_first(where={"team_id": event["team"]})
@@ -72,7 +71,9 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
     logger.debug(f"IN_THREAD: {reply_in_thread}")
     if reply_in_thread:
         to_replace = client.chat_postMessage(
-            channel=event["channel"], thread_ts=event["event_ts"], text=f"Alfred is thinking :robot_face:"
+            channel=event["channel"],
+            thread_ts=event["event_ts"],
+            text=f"Alfred is thinking :robot_face:"
         )
     else:
         to_replace = client.chat_postMessage(channel=event["channel"], text=f"Alfred is thinking :robot_face:")
@@ -117,7 +118,11 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
     else:
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
     print(f"\nREPLY: {reply}")
-    response = client.chat_update(channel=event["channel"], ts=to_replace['message']['ts'], text=reply)
+    response = client.chat_update(
+        channel=event["channel"],
+        ts=to_replace['message']['ts'],
+        text=reply
+    )
     logger.debug(response.data)
     # if the message was made inside the app message tab
     channel_type: Literal["DM_REPLY", "DM_MESSAGE", "CHANNEL_MENTION_REPLY"]
@@ -130,21 +135,22 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
     # if the message was made in a group channel where the bot is mentioned
     else:
         channel_type = "CHANNEL_MENTION_REPLY"
-    conversation_id, celery_task_id = cache_conversation(channel_type, response.data, client, messages)
+    conversation_id = cache_conversation(channel_type, response.data, client, messages)
     # create reference to the start of the issue in the DB or update the issue if already exists
+    task = create_task.delay(conversation_id, token, event["channel"])
     if len(history):
         # fetch the is issue with matching conversation_id
         issue = await prisma.issue.find_first(where={"issue_id": conversation_id})
         # revoke the celery task if it exists
         if issue and issue.celery_task_id:
-            # revoke(state=conversation_id, task_id=issue.celery_task_id, terminate=True, signal="SIGKILL")
+            print(f"Previous celery task ID: {issue.celery_task_id}")
             task = AsyncResult(issue.celery_task_id)
             task.revoke(terminate=True, signal="SIGKILL")
         # issue already exists, therefore try to locate issue in DB and update accordingly
         await prisma.issue.update(
             where={"issue_id": conversation_id},
             data={
-                "celery_task_id": celery_task_id,
+                "celery_task_id": task.id,
                 "employee_id": event["user"],
                 "employee_name": slack_profile.name,
                 "employee_email": slack_profile.email,
@@ -158,7 +164,7 @@ async def generate_reply(event, client: WebClient, logger: logging.Logger, reply
         await prisma.issue.create(data={
             "user_id": user.clerk_id,
             "issue_id": conversation_id,
-            "celery_task_id": celery_task_id,
+            "celery_task_id": task.id,
             "org_id": org.clerk_id,
             "org_name": org.name,
             "channel": "slack",
@@ -208,7 +214,7 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
     # Check if the message was made in the main channel (outside thread)
     if not event.get("thread_ts", None):
         thread_ts = event.get("thread_ts", None) or event["ts"]
-        reply, response, history, user = await generate_reply(event, client, logger)
+        reply, response, history, user = await generate_reply(event, client, token, logger)
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
@@ -233,7 +239,7 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
-        reply, response, history, user = await generate_reply(event, client, logger, bool(thread_ts))
+        reply, response, history, user = await generate_reply(event, client, token, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             slack_profile = get_profile_from_id(event['user'], client)
@@ -260,7 +266,7 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
         is_mentioned = await check_bot_mentioned_in_thread(token, event['channel'], thread_ts, client)
         if is_mentioned:
             # extract message from event
-            reply, response, history, user = await generate_reply(event, client, logger)
+            reply, response, history, user = await generate_reply(event, client, token, logger)
             # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
             if check_can_create_ticket(reply, history):
                 slack_profile = get_profile_from_id(event['user'], client)

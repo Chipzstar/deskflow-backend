@@ -7,6 +7,7 @@ import os
 from pprint import pprint
 
 import uvicorn
+from prisma import Prisma
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -92,6 +93,15 @@ def get_status(task_id):
         "task_result": task_result.result
     }
     return JSONResponse(result)
+
+
+@api.get("/test/prisma")
+async def test_prisma():
+    await prisma.issue.update(
+        where={'issue_id': "B057MQM2RMZ:1688308937.001889"},
+        data=dict(status="resolved")
+    )
+    return {"message": "Success"}
 
 
 @api.post("/api/v1/generate-chat-response")
