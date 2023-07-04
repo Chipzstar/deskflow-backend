@@ -44,16 +44,15 @@ def integrate_kb(payload: ZendeskKBPayload):
     df, embeddings = calculate_embeddings(cleaned_articles)
     print(df.count())
 
-    # save document chunks and knowledge base embdeddings to CSV file for local checking
+    # save document chunks and knowledge base embedddings to CSV file for local checking
     # save_dataframe_to_csv(df, f"data/{get_date_string()}", "zendesk_vector_embeddings.csv")
 
     # Initialise pinecone client with valid API key and environment
     pinecone.init(api_key=PINECONE_API_KEY, environment="us-west1-gcp-free")
     # Connect to the "Alfred" index
     index = pinecone.Index("alfred")
-
     # Insert the vector embeddings into the index
-    store_embeddings_into_pinecone(df, index)
+    store_embeddings_into_pinecone(df, index, payload.email)
     return {"status": "COMPLETE"}
 
 
