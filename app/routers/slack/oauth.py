@@ -5,7 +5,6 @@ from typing import Tuple
 from fastapi import APIRouter, HTTPException, Depends
 from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore, Installation
-from sqlalchemy.orm import Session
 from app.db.prisma_client import prisma
 from prisma.models import User
 from app.utils.types import OAuthPayload
@@ -98,6 +97,15 @@ async def oauth_callback(payload: OAuthPayload):
                         "bot_access_token": bot_token,
                         "scopes": oauth_response.get("scope"),
                     }
+                )
+            else:
+                slack = await prisma.slack.update(
+                    where={"user_id": user.clerk_id},
+                    data={
+                        "access_token": bot_token,
+                        "team_id": installed_team.get("id"),
+                        "team_name": installed_team.get("name"),
+                    },
                 )
             return {"status": "Success", "message": "Thanks for installing Alfred!", "slack": slack}
         else:

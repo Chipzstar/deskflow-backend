@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8000"
+    command: bash -c "uvicorn app.main:api --port=8000 --reload"
+    volumes:
+      - ./app:/usr/src/app
+    environment:
+      - DOPPLER_TOKEN=dp.st.dev.kxm6QzupHXlRWv58ZDFVSJYAMOcccVn4nXq1HRTaKoJ
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis

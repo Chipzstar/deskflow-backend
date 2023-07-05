@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from pprint import pprint
 from typing import Tuple
 
@@ -14,14 +15,12 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
-from app.db.crud import get_zendesk, get_slack_by_team_id
-from app.db.database import SessionLocal
+from app.db.prisma_client import prisma
 from app.utils.gpt import send_zendesk_ticket
 from app.utils.helpers import border_line
 from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id, fetch_access_token
 from app.utils.types import Profile
 
-db = SessionLocal()
 router = APIRouter()
 
 SLACK_APP_TOKEN = os.environ['SLACK_APP_TOKEN']
@@ -46,8 +45,7 @@ app_handler = AsyncSlackRequestHandler(app)
 async def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
     # fetch the user's ID
     user_id = body["user"]["id"]
-    pprint(body)
-    token = await fetch_access_token(body["team"]["id"], db, logging.Logger)
+    token = await fetch_access_token(body["team"]["id"], logging.Logger)
     client = WebClient(token=token)
     profile = get_profile_from_id(user_id, client)
     conversation = client.conversations_history(channel=body["channel"]["id"], limit=3)
@@ -96,7 +94,7 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
         await respond(
             replace_original=True,
             text=f":white_check_mark:  Your query has been sent to <@{selected_user_id}>! \nI will update you as soon "
-            f"as I get a reply",
+                 f"as I get a reply",
         )
     except SlackApiError as e:
         print(f"Error sending message: {e}")
@@ -121,7 +119,6 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
 async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
     await ack()
-    pprint(body)
     authorized, profile, last_message = await validate_user(body)
     if not authorized:
         await respond(
@@ -135,25 +132,25 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
             text="Ok, hold on while I create your Zendesk support ticket for you",
         )
         # fetch user from the DB
-        slack = get_slack_by_team_id(db=db, team_id=body["team"]["id"])
+        slack = await prisma.slack.find_first(where={"team_id": body["team"]["id"]})
         # fetch zendesk config for the user in DB
-        zendesk = get_zendesk(db=db, user_id=slack.user_id)
+        zendesk = await prisma.zendesk.find_first(where={"user_id": slack.user_id})
         # Create a Zendesk support ticket using the data from the action payload
         ticket = await send_zendesk_ticket(last_message, profile, zendesk)
         if ticket:
             await respond(
                 replace_original=True,
                 text=f":white_check_mark: Your support ticket has been created successfully. "
-                f"\nTicket ID: #{ticket['id']}"
-                f"\nSubject: {ticket['subject']}"
-                f"\nDescription: {ticket['description']}"
-                f"\nCreated at: {ticket['created_at']}",
+                     f"\nTicket ID: #{ticket['id']}"
+                     f"\nSubject: {ticket['subject']}"
+                     f"\nDescription: {ticket['description']}"
+                     f"\nCreated at: {ticket['created_at']}",
             )
         else:
             await respond(
                 replace_original=True,
                 text=f"Something went wrong while creating your support ticket. "
-                f"Please try again later",
+                     f"Please try again later",
             )
 
 
@@ -183,6 +180,107 @@ async def handle_contact_support(ack: AsyncAck, body: dict, respond: AsyncRespon
                 }
             ]
         )
+
+
+@app.action({"action_id": "issue_resolved_yes"})
+async def handle_issue_resolved(ack: AsyncAck, body: dict, respond: AsyncRespond):
+    # Acknowledge the action request
+    await ack()
+    pprint(body)
+    authorized = True
+    # authorized, profile, last_message = await validate_user(body)
+    if not authorized:
+        await respond(
+            replace_original=False,
+            text=":x: It seems like you are not the author of this issue",
+        )
+        return
+    else:
+        # fetch the specific issue from the DB using the conversation_id attached in action payload
+        issue = await prisma.issue.update(
+            where={"issue_id": body["actions"][0]["value"]},
+            data={"status": "resolved", "resolved_at": datetime.now()},
+        )
+        if issue:
+            await respond(
+                replace_original=True,
+                text=f":white_check_mark: Thank you. I have marked your issue as resolved. "
+                     f"\nHow satisfied are you with my support on this issue?"
+            )
+        else:
+            await respond(
+                replace_original=True,
+                text=f"Something went wrong while resolving your issue."
+                     f"Your issue may have been marked as resolved by an administrator",
+            )
+
+
+@app.action({"action_id": "issue_resolved_no"})
+async def handle_issue_not_resolved(ack: AsyncAck, body: dict, respond: AsyncRespond):
+    # Acknowledge the action request
+    await ack()
+    authorized = True
+    if not authorized:
+        await respond(
+            replace_original=False,
+            text=":x: It seems like you are not the author of this issue",
+        )
+        return
+    else:
+        # fetch the specific issue from the DB using the conversation_id attached in action payload
+        issue = await prisma.issue.update(
+            where={"issue_id": body["actions"][0]["value"]},
+            data={"status": "unresolved", "resolved_at": datetime.now()},
+        )
+        if issue:
+            await respond(
+                replace_original=True,
+                text=f"I'm sorry to hear that I couldn't resolve your issue."
+                     f"I have marked your issue as unresolved."
+            )
+            await respond(
+                blocks=[
+                    {
+                        "dispatch_action": True,
+                        "type": "input",
+                        "block_id": "input123",
+                        "label": {
+                            "type": "plain_text",
+                            "text": "Please let me know why this issue is still unresolved?"
+                        },
+                        "element": {
+                            "type": "plain_text_input",
+                            "action_id": "unresolved_reason",
+                            "multiline": True,
+                            "placeholder": {"type": "plain_text", "text": "Enter your reason"}
+                        }
+                    }
+                ]
+            )
+        else:
+            await respond(
+                replace_original=True,
+                text=f"Something went wrong while resolving your issue."
+                     f"Your issue may have been marked as resolved by an administrator",
+            )
+
+
+@app.action({"action_id": "unresolved_reason"})
+async def handle_unresolved_reason(ack: AsyncAck, body: dict, respond: AsyncRespond):
+    await ack()
+    pprint(body)
+    reason = body["actions"][0]["text"]
+    try:
+        issue = await prisma.issue.update(
+            where={"issue_id": body["actions"][0]["value"]},
+            data={"unresolved_reason": reason},
+        )
+        await respond(
+            replace_original=True,
+            text=f":white_check_mark:  Thank you for your feedback! \n"
+        )
+    except SlackApiError as e:
+        print(f"Error sending message: {e}")
 
 
 @router.post("/interactions")
