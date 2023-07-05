@@ -7,10 +7,10 @@ import numpy as np
 import openai
 import pandas as pd
 import tiktoken
-import urllib3
+import httpx, asyncio
 from openai.embeddings_utils import cosine_similarity, get_embedding
+from prisma.models import Zendesk
 
-from app.db.schemas import Zendesk
 from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
 from app.utils.types import Message, Profile, ZendeskOAuthCredentials
 
@@ -51,8 +51,12 @@ information needed to create Zendesk tickets.
             
             Please do NOT return any information about the ticket number. This will be provided externally via email.
             """
+ISSUE_CATEGORIES = os.environ["ISSUE_CATEGORIES"]
 
-https = urllib3.PoolManager()
+
+def classify_issue(query: str):
+    categories = [x.strip() for x in ISSUE_CATEGORIES.split(',')]
+    return np.random.choice(categories)
 
 
 def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int:
@@ -157,13 +161,11 @@ async def generate_gpt_chat_response(
     question: str,
     context: str,
     sender_name: str = "Ola",
-    company: str = "Omnicentra",
-    system_message: str = f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at "
-    f"Omnicentra",
+    company: str = "Omnicentra"
 ):
     message = query_message(question, context, company, MAX_INPUT_TOKENS, sender_name)
     messages = [
-        {"role": "system", "content": system_message},
+        {"role": "system", "content": f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at {company}"},
         {"role": "user", "content": message},
     ]
     response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
@@ -195,6 +197,9 @@ async def send_zendesk_ticket(
     zendesk: Zendesk,
     system_message: str = "You are a Zendesk support ticket creator",
 ):
+    border_asterisk()
+    pprint(query)
+    border_asterisk()
     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
             
             QUERY: {query}
@@ -229,60 +234,19 @@ async def send_zendesk_ticket(
         print(f"Failed to create ticket using the payload: {data}")
         return None
     url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
-    response = https.request(
-        'POST',
-        url,
-        body=data,
-        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {creds.oauth_token}'},
-    )
-    # Check the response status code
-    if response.status == 201:
-        print("Ticket created successfully")
-        border_asterisk()
-        pprint(response.json())
-        return response.json()['ticket']
-    else:
-        print(f"Failed to create ticket: {response.data}")
-        return response.data
-
-
-# async def auto_create_zendesk_ticket(
-#         query: str,
-#         messages: List[dict[str, str]],
-#         system_message: str = "You are a Zendesk support ticket creator"
-# ):
-#     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
-#
-#                 QUERY: {query}
-#                 """
-#     messages = [
-#         {"role": "system", "content": system_message},
-#         {"role": "user", "content": message},
-#     ]
-#
-#     response = (
-#         openai.ChatCompletion.create(
-#             messages=messages,
-#             temperature=0,
-#             model=CHAT_COMPLETIONS_MODEL,
-#         )
-#     )
-#     data: Dict = json.loads(response['choices'][0]['message']['content'].replace("`", "").strip())
-#     is_valid = validate_ticket_object(data)
-#     # Set up the authentication credentials
-#     auth = (creds.email + "/token", creds.token)
-#     url = f"https://{creds.subdomain}.zendesk.com/api/v2/tickets.json"
-#     response = requests.post(
-#         url,
-#         json=data,
-#         auth=auth
-#     )
-#
-#     # Check the response status code
-#     if response.status_code == 201:
-#         print("Ticket created successfully")
-#         pprint(response.json())
-#         return response.json()['ticket']
-#     else:
-#         print(f"Failed to create ticket: {response.text}")
-#         return response.text
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            json=data,
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {creds.oauth_token}'}
+        )
+        print(response.text)
+        # Check the response status code
+        if response.status_code == 201:
+            print("Ticket created successfully")
+            border_asterisk()
+            pprint(response.json())
+            return response.json()['ticket']
+        else:
+            print(f"Failed to create ticket: {response.json()}")
+            return response.json()

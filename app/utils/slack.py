@@ -4,18 +4,9 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.models.blocks import SectionBlock, ActionsBlock, DividerBlock
 
-from app.db import database
-from app.db.crud import get_slack_by_team_id
+from app.db.prisma_client import prisma
 from app.utils.helpers import border_asterisk
 from app.utils.types import Profile
-
-
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 async def display_plain_text_dialog(
@@ -50,7 +41,7 @@ async def display_plain_text_dialog(
         print("Error posting message: {}".format(e))
 
 
-async def display_support_dialog(client: WebClient, response):
+def display_support_dialog(client: WebClient, response):
     print("TAKING ACTION!!!!")
     # Define the interactive message
     # Create an interactivity pointer for the "Create ticket" button
@@ -74,12 +65,44 @@ async def display_support_dialog(client: WebClient, response):
         "style": "danger",
         "action_id": "contact_support"
     }
-    # Create a message block containing the header and buttons
-    header = SectionBlock(
-        text="Create Zendesk Support Ticket"
-    )
     buttons = ActionsBlock(
         elements=[create_ticket_pointer, cancel_pointer]
+    )
+    divider = DividerBlock()
+    block = [divider, buttons]
+    # Post a message to a user using the interactivity pointer
+    try:
+        response = client.chat_postMessage(channel=response['channel'], text="New message", blocks=block)
+        print(response)
+    except SlackApiError as e:
+        print("Error posting message: {}".format(e))
+
+
+async def issue_resolved_dialog(client: WebClient, response):
+    # Define the interactive message
+    # Create an interactivity pointer for the "Create ticket" button
+    resolved_pointer = {
+        "type": "button",
+        "text": {
+            "type": "plain_text",
+            "text": "Yes"
+        },
+        "style": "primary",
+        "action_id": "resolved_success"
+    }
+
+    # Create an interactivity pointer for the "Cancel" button
+    not_resolved_pointer = {
+        "type": "button",
+        "text": {
+            "type": "plain_text",
+            "text": "No"
+        },
+        "style": "danger",
+        "action_id": "resolved_failure"
+    }
+    buttons = ActionsBlock(
+        elements=[resolved_pointer, not_resolved_pointer]
     )
     divider = DividerBlock()
     block = [divider, buttons]
@@ -143,14 +166,11 @@ def get_conversation_id(channel, ts, client: WebClient):
     return root_message_id
 
 
-async def fetch_access_token(team_id: str, db, logger):
+async def fetch_access_token(team_id: str, logger):
     # fetch slack access token from database using the team_id
     if not team_id:
         return None
-    slack_config = get_slack_by_team_id(db=db, team_id=team_id)
-    border_asterisk()
-    print(slack_config.access_token)
-    border_asterisk()
+    slack_config = await prisma.slack.find_first(where={"team_id": team_id})
     if not slack_config:
         logger.error(f"Slack config not found for team_id: {team_id}")
         return

@@ -4,6 +4,8 @@ import os
 from pprint import pprint
 from typing import Callable, Literal
 
+from celery.result import AsyncResult
+from app.db.prisma_client import prisma
 from fastapi import APIRouter, Request
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from slack_bolt.app.async_app import AsyncApp
@@ -13,8 +15,6 @@ from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
-from app.db.crud import get_slack_by_team_id, get_user, get_zendesk
-from app.db.database import SessionLocal
 from app.redis.client import Redis
 from app.redis.utils import cache_conversation
 from app.utils.gpt import (
@@ -22,16 +22,16 @@ from app.utils.gpt import (
     generate_context_array,
     continue_chat_response,
     generate_gpt_chat_response,
-    send_zendesk_ticket,
+    send_zendesk_ticket, classify_issue,
 )
 from app.utils.helpers import (
     remove_custom_delimiters,
     check_reply_requires_action,
     check_can_create_ticket,
-    get_vector_embeddings_from_pinecone,
-    border_asterisk,
+    get_vector_embeddings_from_pinecone
 )
 from app.utils.slack import display_support_dialog, get_user_from_event, get_profile_from_id, fetch_access_token
+from app.worker import create_task
 
 router = APIRouter()
 
@@ -54,11 +54,16 @@ app = AsyncApp(oauth_settings=oauth_settings, signing_secret=SLACK_SIGNING_SECRE
 app_handler = AsyncSlackRequestHandler(app)
 
 
-async def generate_reply(db: SessionLocal, event, client: WebClient, logger: logging.Logger, reply_in_thread=True):
+async def generate_reply(event, client: WebClient, token: str, logger: logging.Logger, reply_in_thread=True):
     pprint(event)
     # fetch slack + user info from DB
-    slack = get_slack_by_team_id(db=db, team_id=event["team"])
-    user = get_user(db=db, user_id=slack.user_id)
+    slack = await prisma.slack.find_first(where={"team_id": event["team"]})
+    if slack is None:
+        logger.error(f"Slack not found for team {event['team']}")
+        return "", None, [], None
+    user = await prisma.user.find_unique(where={"clerk_id": slack.user_id})
+    org = await prisma.organization.find_unique(where={"clerk_id": user.organization_id})
+    slack_profile = get_profile_from_id(event["user"], client)
     logger.debug(user)
     history = []
     thread_ts = event.get("thread_ts", None)
@@ -66,7 +71,9 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
     logger.debug(f"IN_THREAD: {reply_in_thread}")
     if reply_in_thread:
         to_replace = client.chat_postMessage(
-            channel=event["channel"], thread_ts=event["event_ts"], text=f"Alfred is thinking :robot_face:"
+            channel=event["channel"],
+            thread_ts=event["event_ts"],
+            text=f"Alfred is thinking :robot_face:"
         )
     else:
         to_replace = client.chat_postMessage(channel=event["channel"], text=f"Alfred is thinking :robot_face:")
@@ -81,7 +88,7 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
         if byte_result:
             str_result = str(byte_result, encoding='utf-8')
             history = json.loads(str_result)
-    # check if the message was made inside alfred jnr chat message tab
+    # check if the message was made inside alfred chat message tab
     elif str(event["channel"]).startswith("D"):
         conversation_id = f"{bot_id}:{event['channel']}"
         r = Redis()
@@ -99,11 +106,6 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
     print(f"\nMESSAGE:\t {message}")
     # download knowledge base embeddings from pinecone namespace
     knowledge_base = get_vector_embeddings_from_pinecone("alfred", user.email)
-    border_asterisk()
-    print(knowledge_base.head())
-    print(knowledge_base.tail())
-    print(knowledge_base.count())
-    border_asterisk()
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
     similarities = await get_similarities(message, knowledge_base)
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
@@ -116,7 +118,11 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
     else:
         reply, messages = await generate_gpt_chat_response(message, context, sender_name)
     print(f"\nREPLY: {reply}")
-    response = client.chat_update(channel=event["channel"], ts=to_replace['message']['ts'], text=reply)
+    response = client.chat_update(
+        channel=event["channel"],
+        ts=to_replace['message']['ts'],
+        text=reply
+    )
     logger.debug(response.data)
     # if the message was made inside the app message tab
     channel_type: Literal["DM_REPLY", "DM_MESSAGE", "CHANNEL_MENTION_REPLY"]
@@ -129,7 +135,47 @@ async def generate_reply(db: SessionLocal, event, client: WebClient, logger: log
     # if the message was made in a group channel where the bot is mentioned
     else:
         channel_type = "CHANNEL_MENTION_REPLY"
-    result = cache_conversation(channel_type, response.data, client, messages)
+    conversation_id = cache_conversation(channel_type, response.data, client, messages)
+    # create reference to the start of the issue in the DB or update the issue if already exists
+    task = create_task.delay(conversation_id, token, event["channel"])
+    if len(history):
+        # fetch the is issue with matching conversation_id
+        issue = await prisma.issue.find_first(where={"issue_id": conversation_id})
+        # revoke the celery task if it exists
+        if issue and issue.celery_task_id:
+            print(f"Previous celery task ID: {issue.celery_task_id}")
+            task = AsyncResult(issue.celery_task_id)
+            task.revoke(terminate=True, signal="SIGKILL")
+        # issue already exists, therefore try to locate issue in DB and update accordingly
+        await prisma.issue.update(
+            where={"issue_id": conversation_id},
+            data={
+                "celery_task_id": task.id,
+                "employee_id": event["user"],
+                "employee_name": slack_profile.name,
+                "employee_email": slack_profile.email,
+                "category": classify_issue(message),
+                "messageHistory": str(messages),
+                "status": "open",
+                "is_satisfied": False
+            }
+        )
+    else:
+        await prisma.issue.create(data={
+            "user_id": user.clerk_id,
+            "issue_id": conversation_id,
+            "celery_task_id": task.id,
+            "org_id": org.clerk_id,
+            "org_name": org.name,
+            "channel": "slack",
+            "employee_id": event["user"],
+            "employee_name": slack_profile.name,
+            "employee_email": slack_profile.email,
+            "category": classify_issue(message),
+            "messageHistory": str(messages),
+            "status": "open",
+            "is_satisfied": False
+        })
     return reply, response.data, messages, user
 
 
@@ -163,18 +209,17 @@ async def handle_app_mention(body: dict, say: AsyncSay, logger):
     print("app_mention event:")
     event = body["event"]
     logger.debug(event)
-    db = SessionLocal()
-    token = await fetch_access_token(body["authorizations"][0]["team_id"], db, logger)
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], logger)
     client = WebClient(token=token)
     # Check if the message was made in the main channel (outside thread)
     if not event.get("thread_ts", None):
         thread_ts = event.get("thread_ts", None) or event["ts"]
-        reply, response, history, user = await generate_reply(db, event, client, logger)
+        reply, response, history, user = await generate_reply(event, client, token, logger)
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             profile = get_profile_from_id(event['user'], client)
             # fetch zendesk config for the user in DB
-            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+            zendesk = await prisma.zendesk.find_first(where={"user_id": user.clerk_id})
             await send_zendesk_ticket(reply, profile, zendesk)
         # check if Alfred could not find the answer in the knowledge base and is offering to create a ticket on zendesk
         # OR to contact someone from HR/IT
@@ -189,18 +234,17 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
     event = body["event"]
     logger.debug(event)
     thread_ts = event.get("thread_ts", None)
-    db = SessionLocal()
-    token = await fetch_access_token(body["authorizations"][0]["team_id"], db, logger)
+    token = await fetch_access_token(body["authorizations"][0]["team_id"], logger)
     client = WebClient(token=token)
     # USE CASE 1: Message sent directly to Alfred bot via the message tab
     if event["channel_type"] == "im":
         print("handle_bot_message event:")
-        reply, response, history, user = await generate_reply(db, event, client, logger, bool(thread_ts))
+        reply, response, history, user = await generate_reply(event, client, token, logger, bool(thread_ts))
         # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
         if check_can_create_ticket(reply, history):
             slack_profile = get_profile_from_id(event['user'], client)
             # fetch zendesk config for the user in DB
-            zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+            zendesk = await prisma.zendesk.find_first(where={"user_id": user.clerk_id})
             if zendesk:
                 await send_zendesk_ticket(reply, slack_profile, zendesk)
             else:
@@ -222,12 +266,12 @@ async def handle_message(body: dict, say: AsyncSay, logger: logging.Logger):
         is_mentioned = await check_bot_mentioned_in_thread(token, event['channel'], thread_ts, client)
         if is_mentioned:
             # extract message from event
-            reply, response, history, user = await generate_reply(db, event, client, logger)
+            reply, response, history, user = await generate_reply(event, client, token, logger)
             # check if Alfred wants to create a Zendesk ticket and has all information needed to create one
             if check_can_create_ticket(reply, history):
                 slack_profile = get_profile_from_id(event['user'], client)
                 # fetch zendesk config for the user in DB
-                zendesk = get_zendesk(db=db, user_id=user.clerk_id)
+                zendesk = await prisma.zendesk.find_first(where={"user_id": user.clerk_id})
                 if zendesk:
                     await send_zendesk_ticket(reply, slack_profile, zendesk)
                 else:
