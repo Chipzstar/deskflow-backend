@@ -1,4 +1,6 @@
 import os
+from pprint import pprint
+
 import redis
 
 HOST = os.environ.get('REDIS_HOST', 'localhost')

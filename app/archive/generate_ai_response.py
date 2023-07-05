@@ -18,27 +18,13 @@
 # ### Import libraries
 
 import os
-
-from bs4 import BeautifulSoup
-import mwclient  # for downloading example Wikipedia articles
-import mwparserfromhell  # for splitting Wikipedia articles into sections
-import openai  # for generating embeddings
-import numpy as np  # for arrays to store embeddings
-from numpy import random
-import pandas as pd  # for DataFrames to store article sections and embeddings
-import re  # for cutting <ref> links out of Wikipedia articles
-import tiktoken  # for counting tokens
-from datetime import datetime
-from tqdm.auto import tqdm  # this is our progress bar
-from starlette.responses import HTMLResponse
-
-# Import the Zenpy Class
-from zenpy import Zenpy
-from zenpy.lib.api_objects import Ticket
-from pprint import pprint
-from scipy import spatial  # for calculating vector similarities for search
 import typing  # for type hints
+from datetime import datetime
 
+import openai  # for generating embeddings
+import pandas as pd  # for DataFrames to store article sections and embeddings
+# Import the Zenpy Class
+from scipy import spatial  # for calculating vector similarities for search
 
 # GLOBAL VARIABLES #
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
