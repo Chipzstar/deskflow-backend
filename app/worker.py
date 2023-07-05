@@ -21,7 +21,7 @@ celery.conf.broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:
 celery.conf.result_backend = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379")
 celery.flower_unauthenticated_api = True
 
-if not os.environ.get("DOPPLER_ENVIRONMENT") == "dev":
+if os.environ.get("DOPPLER_ENVIRONMENT") == "prd":
     celery.conf.redis_backend_use_ssl = {
         'ssl_cert_reqs': ssl.CERT_NONE
     }
