@@ -2,17 +2,14 @@ import os
 from pprint import pprint
 
 import pinecone
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter
 from zenpy import Zenpy
 
-from app.db.database import SessionLocal
 from app.utils.helpers import border_line
-from app.utils.types import OAuthPayload, ZendeskKBPayload
+from app.utils.types import ZendeskKBPayload
 from app.utils.zendesk import (
     fetch_zendesk_sections,
     fetch_zendesk_articles_by_section,
-    create_txt_knowledge_base,
     clean_up_text,
     print_example_data,
     calculate_embeddings,
@@ -21,20 +18,11 @@ from app.utils.zendesk import (
 
 PINECONE_API_KEY = os.environ["PINECONE_API_KEY"]
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 router = APIRouter()
 
 
 @router.post("/knowledge-base")
-def integrate_kb(payload: ZendeskKBPayload, db: Session = Depends(get_db)):
+def integrate_kb(payload: ZendeskKBPayload):
     # Configure Zendesk API config
     # Zenpy accepts an API token
     border_line()
@@ -56,21 +44,20 @@ def integrate_kb(payload: ZendeskKBPayload, db: Session = Depends(get_db)):
     df, embeddings = calculate_embeddings(cleaned_articles)
     print(df.count())
 
-    # save document chunks and knowledge base embdeddings to CSV file for local checking
+    # save document chunks and knowledge base embedddings to CSV file for local checking
     # save_dataframe_to_csv(df, f"data/{get_date_string()}", "zendesk_vector_embeddings.csv")
 
     # Initialise pinecone client with valid API key and environment
     pinecone.init(api_key=PINECONE_API_KEY, environment="us-west1-gcp-free")
     # Connect to the "Alfred" index
     index = pinecone.Index("alfred")
-
     # Insert the vector embeddings into the index
-    store_embeddings_into_pinecone(df, index)
+    store_embeddings_into_pinecone(df, index, payload.email)
     return {"status": "COMPLETE"}
 
 
 @router.delete("/knowledge-base")
-def delete_kb(db: Session = Depends(get_db)):
+def delete_kb():
     pinecone.init(api_key=PINECONE_API_KEY, environment="us-west1-gcp-free"),
     # Connect to the "Alfred" index,
     index = pinecone.Index("alfred")
