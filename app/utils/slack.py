@@ -1,3 +1,4 @@
+import os
 from pprint import pprint
 
 from slack_sdk import WebClient
@@ -9,12 +10,15 @@ from app.utils.helpers import border_asterisk
 from app.utils.types import Profile
 
 
+installation_base_dir = (
+    f"{os.getcwd()}/app/data/installations"
+    if os.environ["DOPPLER_ENVIRONMENT"] == "dev"
+    else f"/var/data"
+)
+
+
 async def display_plain_text_dialog(
-        question: str,
-        sender_id: str,
-        recipient_name: str,
-        client: WebClient,
-        response
+    question: str, sender_id: str, recipient_name: str, client: WebClient, response
 ):
     pprint(response)
     blocks = [
@@ -22,20 +26,15 @@ async def display_plain_text_dialog(
             "type": "input",
             "dispatch_action": True,
             "block_id": sender_id,
-            "element": {
-                "type": "plain_text_input",
-                "action_id": "reply_support"
-            },
-            "label": {
-                "type": "plain_text",
-                "text": question,
-                "emoji": True
-            },
+            "element": {"type": "plain_text_input", "action_id": "reply_support"},
+            "label": {"type": "plain_text", "text": question, "emoji": True},
         }
     ]
     # Post a message to a user using the interactivity pointer
     try:
-        response = client.chat_postMessage(channel=response['channel'], text=question, blocks=blocks)
+        response = client.chat_postMessage(
+            channel=response["channel"], text=question, blocks=blocks
+        )
         print(response)
     except SlackApiError as e:
         print("Error posting message: {}".format(e))
@@ -47,32 +46,26 @@ def display_support_dialog(client: WebClient, response):
     # Create an interactivity pointer for the "Create ticket" button
     create_ticket_pointer = {
         "type": "button",
-        "text": {
-            "type": "plain_text",
-            "text": "Create ticket"
-        },
+        "text": {"type": "plain_text", "text": "Create ticket"},
         "style": "primary",
-        "action_id": "create_ticket"
+        "action_id": "create_ticket",
     }
 
     # Create an interactivity pointer for the "Cancel" button
     cancel_pointer = {
         "type": "button",
-        "text": {
-            "type": "plain_text",
-            "text": "Contact HR/IT Support"
-        },
+        "text": {"type": "plain_text", "text": "Contact HR/IT Support"},
         "style": "danger",
-        "action_id": "contact_support"
+        "action_id": "contact_support",
     }
-    buttons = ActionsBlock(
-        elements=[create_ticket_pointer, cancel_pointer]
-    )
+    buttons = ActionsBlock(elements=[create_ticket_pointer, cancel_pointer])
     divider = DividerBlock()
     block = [divider, buttons]
     # Post a message to a user using the interactivity pointer
     try:
-        response = client.chat_postMessage(channel=response['channel'], text="New message", blocks=block)
+        response = client.chat_postMessage(
+            channel=response["channel"], text="New message", blocks=block
+        )
         print(response)
     except SlackApiError as e:
         print("Error posting message: {}".format(e))
@@ -83,32 +76,26 @@ async def issue_resolved_dialog(client: WebClient, response):
     # Create an interactivity pointer for the "Create ticket" button
     resolved_pointer = {
         "type": "button",
-        "text": {
-            "type": "plain_text",
-            "text": "Yes"
-        },
+        "text": {"type": "plain_text", "text": "Yes"},
         "style": "primary",
-        "action_id": "resolved_success"
+        "action_id": "resolved_success",
     }
 
     # Create an interactivity pointer for the "Cancel" button
     not_resolved_pointer = {
         "type": "button",
-        "text": {
-            "type": "plain_text",
-            "text": "No"
-        },
+        "text": {"type": "plain_text", "text": "No"},
         "style": "danger",
-        "action_id": "resolved_failure"
+        "action_id": "resolved_failure",
     }
-    buttons = ActionsBlock(
-        elements=[resolved_pointer, not_resolved_pointer]
-    )
+    buttons = ActionsBlock(elements=[resolved_pointer, not_resolved_pointer])
     divider = DividerBlock()
     block = [divider, buttons]
     # Post a message to a user using the interactivity pointer
     try:
-        response = client.chat_postMessage(channel=response['channel'], text="New message", blocks=block)
+        response = client.chat_postMessage(
+            channel=response["channel"], text="New message", blocks=block
+        )
         print(response)
     except SlackApiError as e:
         print("Error posting message: {}".format(e))
@@ -128,7 +115,7 @@ def get_user_from_id(user_id: str, client: WebClient):
 def get_profile_from_id(user_id: str, client: WebClient) -> Profile:
     try:
         response = client.users_profile_get(user=user_id)
-        profile = response.data['profile']
+        profile = response.data["profile"]
         pprint(f"{user_id} <=> {profile['first_name']}")
         return Profile(name=profile["real_name_normalized"], email=profile["email"])
     except SlackApiError as e:
@@ -147,7 +134,7 @@ async def get_user_from_event(event, client: WebClient):
         if response.data:
             profile = response.data["user"]["profile"]
             pprint(f"{user_id} <=> {profile['first_name']}")
-            print("-"*75)
+            print("-" * 75)
             return profile
     except SlackApiError as e:
         print("Error getting user: {}".format(e))
@@ -156,13 +143,9 @@ async def get_user_from_event(event, client: WebClient):
 
 def get_conversation_id(channel, ts, client: WebClient):
     # fetch all replies from the last message
-    conversation = client.conversations_replies(
-        channel=channel,
-        ts=ts,
-        inclusive=True
-    )
+    conversation = client.conversations_replies(channel=channel, ts=ts, inclusive=True)
     # get the timestamp of the root message for the conversation
-    root_message_id = conversation.data["messages"][0]['ts']
+    root_message_id = conversation.data["messages"][0]["ts"]
     return root_message_id
 
 
