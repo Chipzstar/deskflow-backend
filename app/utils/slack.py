@@ -13,7 +13,7 @@ from app.utils.types import Profile
 installation_base_dir = (
     f"{os.getcwd()}/app/data/installations"
     if os.environ["DOPPLER_ENVIRONMENT"] == "dev"
-    else f"{os.getcwd()}/var/data"
+    else f"/var/data"
 )
 
 
