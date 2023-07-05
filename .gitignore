@@ -4,6 +4,7 @@ wandb
 Pipfile.lock
 .fleet
 .ipynb_checkpoints/
+**/*__pycache__
 
 # App ignores
 docker-compose.override.yml
