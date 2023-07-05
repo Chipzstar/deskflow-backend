@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pprint import pprint
 from typing import Literal, List, Dict
@@ -6,7 +7,7 @@ from redis.exceptions import ResponseError, RedisError
 from slack_sdk import WebClient
 
 from app.redis.client import Redis
-from app.utils.helpers import ONE_DAY_IN_SECONDS, ONE_HOUR_IN_SECONDS
+from app.utils.helpers import ONE_DAY_IN_SECONDS, ONE_HOUR_IN_SECONDS, TWO_DAYS_IN_SECONDS
 from app.utils.slack import get_conversation_id
 
 
@@ -25,10 +26,12 @@ def cache_conversation(
                 client
             )
             conversation_id = f"{bot_id}:{root_message_id}"
-            pprint(f"CONVERSATION ID: {root_message_id}")
+            pprint(f"CONVERSATION ID: {conversation_id}")
             r = Redis()
             # Cache the message in Redis using the message ID as the key, TTL = 1 day
             r.add_to_cache(conversation_id, json.dumps(history), ONE_DAY_IN_SECONDS)
+            # schedule a worker job to send a message to the user that the conversation is now finished after the
+            # cache expires
         else:
             for message in history:
                 print(message)
@@ -38,7 +41,9 @@ def cache_conversation(
             r = Redis()
             # Cache the message in Redis using the message ID as the key, TTL = 1 hour
             r.add_to_cache(conversation_id, json.dumps(history), ONE_HOUR_IN_SECONDS)
-        return "Success"
+            # schedule a worker job to send a message to the user that the conversation is now finished after the
+            # cache expires
+        return conversation_id
     except ResponseError as e:
         print(f"Response Error: {e}")
         return None

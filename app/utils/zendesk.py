@@ -1,23 +1,15 @@
 import os
-from bs4 import BeautifulSoup
-import mwclient  # for downloading example Wikipedia articles
-import mwparserfromhell  # for splitting Wikipedia articles into sections
+from pprint import pprint
+
 import openai  # for generating embeddings
-import numpy as np  # for arrays to store embeddings
 import pandas as pd  # for DataFrames to store article sections and embeddings
-import re  # for cutting <ref> links out of Wikipedia articles
+import pinecone
 import tiktoken  # for counting tokens
-from datetime import datetime
+from bs4 import BeautifulSoup
 from tqdm.auto import tqdm  # this is our progress bar
 
 # Import the Zenpy Class
 from zenpy import Zenpy
-from zenpy.lib.api_objects import Ticket
-from pprint import pprint
-from scipy import spatial  # for calculating vector similarities for search
-import typing  # for type hints
-import pinecone
-
 
 # GLOBAL VARIABLES
 MAX_INPUT_TOKENS = 8191
@@ -85,7 +77,10 @@ def clean_up_text(articles):
     cleaned_articles = []
     for title, body, category in articles:
         cleaned_body = BeautifulSoup(body, "html.parser").get_text()
-        if num_tokens_from_text(title.strip() + cleaned_body.strip()) > MAX_INPUT_TOKENS:
+        if (
+            num_tokens_from_text(title.strip() + cleaned_body.strip())
+            > MAX_INPUT_TOKENS
+        ):
             left = body[:MAX_INPUT_TOKENS]
             right = body[MAX_INPUT_TOKENS:]
             cleaned_articles.append((title, left, category))
@@ -125,12 +120,21 @@ def calculate_embeddings(articles):
         print(f"Batch {batch_start} to {batch_end - 1}")
         response = openai.Embedding.create(model=EMBEDDING_MODEL, input=batch_text)
         for i, be in enumerate(response["data"]):
-            assert i == be["index"]  # double check embeddings are in same order as input
+            assert (
+                i == be["index"]
+            )  # double check embeddings are in same order as input
         batch_embeddings = [e["embedding"] for e in response["data"]]
         embeddings.extend(batch_embeddings)
 
     return (
-        pd.DataFrame({"titles": titles, "content": content, "categories": categories, "embedding": embeddings}),
+        pd.DataFrame(
+            {
+                "titles": titles,
+                "content": content,
+                "categories": categories,
+                "embedding": embeddings,
+            }
+        ),
         embeddings,
     )
 
@@ -153,7 +157,7 @@ def store_embeddings_into_pinecone(
         ids_batch = [str(n) for n in range(i, i_end)]
         # prep metadata and upsert batch
         meta = [
-            {'title': titles, "content": content, "category": categories}
+            {"title": titles, "content": content, "category": categories}
             for titles, content, categories, embeddings in batch.to_numpy()
         ]
         to_upsert = zip(ids_batch, embeddings_batch, meta)

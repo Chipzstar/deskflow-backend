@@ -1,0 +1,52 @@
+x-doppler: &doppler-env
+  environment:{{range $key, $value := .}}
+    - {{$key}}{{end}}
+
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8000"
+    command: bash -c "uvicorn app.main:api --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./app:/usr/src/code/app
+    <<: *doppler-env
+    depends_on:
+      - redis
+  worker:
+    build: .
+    command: celery -A app.worker worker --loglevel=info --logfile=/code/app/logs/celery.log --uid=celery
+    volumes:
+      - ./app:/usr/src/app
+    environment:
+      - DOPPLER_ENVIRONMENT=dev
+      - DOPPLER_TOKEN=${DOPPLER_TOKEN}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - C_FORCE_ROOT=false
+    depends_on:
+      - api
+      - redis
+  redis:
+    image: redis:7
+    ports:
+      - "8081:6379"
+  flower:
+    build: .
+    command: celery -A app.worker --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - DOPPLER_ENVIRONMENT=dev
+      - FLOWER_UNAUTHENTICATED_API=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis
+    depends_on:
+      - api
+      - redis
+      - worker
