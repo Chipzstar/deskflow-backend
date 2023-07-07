@@ -32,3 +32,6 @@ venv.bak/
 # Celery
 **/*celery.log
 !**/
+
+# Docker
+docker-compose.yml
