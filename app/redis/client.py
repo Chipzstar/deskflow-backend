@@ -38,3 +38,6 @@ class Redis(object):
 
     def get_value(self, key):
         return self.__redis.get(key)
+
+    def delete_key(self, key):
+        self.__redis.delete(key)

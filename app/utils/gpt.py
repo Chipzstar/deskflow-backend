@@ -3,6 +3,7 @@ import os
 from pprint import pprint
 from typing import List, Dict, Literal
 
+import random
 import numpy as np
 import openai
 import pandas as pd
@@ -56,7 +57,7 @@ ISSUE_CATEGORIES = os.environ["ISSUE_CATEGORIES"]
 
 def classify_issue(query: str):
     categories = [x.strip() for x in ISSUE_CATEGORIES.split(',')]
-    return np.random.choice(categories)
+    return random.choice(categories)
 
 
 def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int:

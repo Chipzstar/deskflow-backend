@@ -92,12 +92,12 @@ def get_vector_embeddings_from_pinecone(index_name: str, namespace: str = "chipz
     p = Pinecone()
     # Connect to the index <INDEX_NAME> provided
     index = p.index(index_name)
-    # describe the pincone index
+    # describe the pinecone index
     index_stats = index.describe_index_stats()
     # extract the total_vector_count
-    num_vectors = int(index_stats["total_vector_count"])
+    num_vectors = int(index_stats["namespaces"][namespace]["vector_count"])
     # Use vector count to fetch all vectors in the index
-    ids = [str(x) for x in range(0, 38)]
+    ids = [str(x) for x in range(0, num_vectors)]
     vectors = (index.fetch(ids=ids, namespace=namespace))["vectors"]
     # Keys = list(vectors.keys())
     # Keys.sort(key=int)

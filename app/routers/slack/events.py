@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from pprint import pprint
 from typing import Callable, Literal
 
@@ -16,7 +17,7 @@ from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
 from app.redis.client import Redis
-from app.redis.utils import cache_conversation
+from app.redis.utils import generate_conversation_id, create_issue, update_issue
 from app.utils.gpt import (
     get_similarities,
     generate_context_array,
@@ -29,7 +30,7 @@ from app.utils.helpers import (
     remove_custom_delimiters,
     check_reply_requires_action,
     check_can_create_ticket,
-    get_vector_embeddings_from_pinecone,
+    get_vector_embeddings_from_pinecone, ONE_HOUR_IN_SECONDS, border_asterisk,
 )
 from app.utils.slack import (
     display_support_dialog,
@@ -67,6 +68,8 @@ app_handler = AsyncSlackRequestHandler(app)
 async def generate_reply(
     event, client: WebClient, token: str, logger: logging.Logger, reply_in_thread=True
 ):
+    history = []
+    issue_id = None
     pprint(event)
     # fetch slack + user info from DB
     slack = await prisma.slack.find_first(where={"team_id": event["team"]})
@@ -74,12 +77,8 @@ async def generate_reply(
         logger.error(f"Slack not found for team {event['team']}")
         return "", None, [], None
     user = await prisma.user.find_unique(where={"clerk_id": slack.user_id})
-    org = await prisma.organization.find_unique(
-        where={"clerk_id": user.organization_id}
-    )
     slack_profile = get_profile_from_id(event["user"], client)
     logger.debug(user)
-    history = []
     thread_ts = event.get("thread_ts", None)
     # initially return a message that Alfred is thinking and store metadata for that message
     logger.debug(f"IN_THREAD: {reply_in_thread}")
@@ -141,9 +140,8 @@ async def generate_reply(
     response = client.chat_update(
         channel=event["channel"], ts=to_replace["message"]["ts"], text=reply
     )
-    logger.debug(response.data)
-    # if the message was made inside the app message tab
     channel_type: Literal["DM_REPLY", "DM_MESSAGE", "CHANNEL_MENTION_REPLY"]
+    # if the message was made inside the app message tab
     if "channel_type" in event and event["channel_type"] == "im":
         # if the message was a reply
         if thread_ts:
@@ -153,48 +151,36 @@ async def generate_reply(
     # if the message was made in a group channel where the bot is mentioned
     else:
         channel_type = "CHANNEL_MENTION_REPLY"
-    conversation_id = cache_conversation(channel_type, response.data, client, messages)
+    conversation_id = generate_conversation_id(channel_type, response.data, client, messages)
+    issue_id = f"issue_{int(time.time())}"
+    r = Redis()
+    # Cache the message in Redis using the message ID as the key, TTL = 1 hour
+    r.add_to_cache(conversation_id, json.dumps(messages), ONE_HOUR_IN_SECONDS)
+    # schedule a worker job to send a message to the user that the conversation is now finished after the
+    # cache expires
+    task = create_task.delay(conversation_id, issue_id, token, event["channel"], True)
+    category = classify_issue(message)
     # create reference to the start of the issue in the DB or update the issue if already exists
-    task = create_task.delay(conversation_id, token, event["channel"])
-    if len(history):
-        # fetch the is issue with matching conversation_id
-        issue = await prisma.issue.find_first(where={"issue_id": conversation_id})
-        # revoke the celery task if it exists
-        if issue and issue.celery_task_id:
-            print(f"Previous celery task ID: {issue.celery_task_id}")
-            task = AsyncResult(issue.celery_task_id)
-            task.revoke(terminate=True, signal="SIGKILL")
-        # issue already exists, therefore try to locate issue in DB and update accordingly
-        await prisma.issue.update(
-            where={"issue_id": conversation_id},
-            data={
-                "celery_task_id": task.id,
-                "employee_id": event["user"],
-                "employee_name": slack_profile.name,
-                "employee_email": slack_profile.email,
-                "category": classify_issue(message),
-                "messageHistory": str(messages),
-                "status": "open",
-                "is_satisfied": False,
-            },
+    if not len(history):
+        issue = await create_issue(
+            conversation_id,
+            issue_id,
+            task.id,
+            user,
+            slack_profile,
+            event["user"],
+            category,
+            messages
         )
     else:
-        await prisma.issue.create(
-            data={
-                "user_id": user.clerk_id,
-                "issue_id": conversation_id,
-                "celery_task_id": task.id,
-                "org_id": org.clerk_id,
-                "org_name": org.name,
-                "channel": "slack",
-                "employee_id": event["user"],
-                "employee_name": slack_profile.name,
-                "employee_email": slack_profile.email,
-                "category": classify_issue(message),
-                "messageHistory": str(messages),
-                "status": "open",
-                "is_satisfied": False,
-            }
+        issue = await update_issue(
+            conversation_id,
+            issue_id,
+            task.id,
+            slack_profile,
+            event["user"],
+            category,
+            messages
         )
     return reply, response.data, messages, user
 
