@@ -7,18 +7,19 @@ from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore, Installation
 from app.db.prisma_client import prisma
 from prisma.models import User
+from app.utils.slack import installation_base_dir
 from app.utils.types import OAuthPayload
 
 
 router = APIRouter()
 
-SLACK_CLIENT_ID = os.environ['SLACK_CLIENT_ID']
-SLACK_CLIENT_SECRET = os.environ['SLACK_CLIENT_SECRET']
-SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
-CLIENT_HOST = os.environ.get('CLIENT_HOST', None)
+SLACK_CLIENT_ID = os.environ["SLACK_CLIENT_ID"]
+SLACK_CLIENT_SECRET = os.environ["SLACK_CLIENT_SECRET"]
+SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
+CLIENT_HOST = os.environ.get("CLIENT_HOST", None)
 
 # Persist installation data and lookup it by IDs.
-installation_store = FileInstallationStore(base_dir=f"{os.getcwd()}/app/data/installations")
+installation_store = FileInstallationStore(base_dir=installation_base_dir)
 
 
 async def verify_state(state: str) -> Tuple[User, bool]:
@@ -77,7 +78,9 @@ async def oauth_callback(payload: OAuthPayload):
                 incoming_webhook_url=incoming_webhook.get("url"),
                 incoming_webhook_channel=incoming_webhook.get("channel"),
                 incoming_webhook_channel_id=incoming_webhook.get("channel_id"),
-                incoming_webhook_configuration_url=incoming_webhook.get("configuration_url"),
+                incoming_webhook_configuration_url=incoming_webhook.get(
+                    "configuration_url"
+                ),
                 is_enterprise_install=is_enterprise_install,
                 token_type=oauth_response.get("token_type"),
             )
@@ -107,9 +110,14 @@ async def oauth_callback(payload: OAuthPayload):
                         "team_name": installed_team.get("name"),
                     },
                 )
-            return {"status": "Success", "message": "Thanks for installing Alfred!", "slack": slack}
+            return {
+                "status": "Success",
+                "message": "Thanks for installing Alfred!",
+                "slack": slack,
+            }
         else:
             raise HTTPException(
-                detail=f"Try the installation again (the state value is already expired)", status_code=400
+                detail=f"Try the installation again (the state value is already expired)",
+                status_code=400,
             )
     raise HTTPException(status_code=404, detail="Authorization code was not provided!")
