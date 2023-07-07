@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from zenpy import Zenpy
 
 from app.utils.helpers import border_line
-from app.utils.types import ZendeskKBPayload
+from app.utils.types import ZendeskKBPayload, DeleteKBPayload
 from app.utils.zendesk import (
     fetch_zendesk_sections,
     fetch_zendesk_articles_by_section,
@@ -44,7 +44,7 @@ def integrate_kb(payload: ZendeskKBPayload):
     df, embeddings = calculate_embeddings(cleaned_articles)
     print(df.count())
 
-    # save document chunks and knowledge base embedddings to CSV file for local checking
+    # save document chunks and knowledge base embeddings to CSV file for local checking
     # save_dataframe_to_csv(df, f"data/{get_date_string()}", "zendesk_vector_embeddings.csv")
 
     # Initialise pinecone client with valid API key and environment
@@ -57,14 +57,14 @@ def integrate_kb(payload: ZendeskKBPayload):
 
 
 @router.delete("/knowledge-base")
-def delete_kb():
+def delete_kb(payload: DeleteKBPayload):
     pinecone.init(api_key=PINECONE_API_KEY, environment="us-west1-gcp-free"),
     # Connect to the "Alfred" index,
     index = pinecone.Index("alfred")
     index_stats = index.describe_index_stats()
     # extract the total_vector_count
-    num_vectors = int(index_stats["total_vector_count"])
+    num_vectors = int(index_stats["namespaces"][payload.email]["vector_count"])
     # Use vector count to fetch all vectors in the index
-    ids = [str(x) for x in range(0, 38)]
-    index.delete(ids=ids, namespace="chipzstar.dev@googlemail.com")
-    return {"status": "Success", "message": "Vectors deleted!"}
+    ids = [str(x) for x in range(0, num_vectors)]
+    index.delete(ids=ids, namespace=payload.email)
+    return {"status": "Success", "message": f"Vectors deleted for namespace {payload.email}!"}

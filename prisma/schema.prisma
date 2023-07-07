@@ -35,26 +35,27 @@ enum CommunicationChannel {
 }
 
 model Issue {
-  id             Int                  @id @default(autoincrement())
-  created_at     DateTime             @default(now())
-  updated_at     DateTime             @updatedAt
-  resolved_at    DateTime?
-  issue_id       String               @unique
-  celery_task_id String
-  user_id        String
-  user           User                 @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
-  org_name       String               @default("")
-  channel        CommunicationChannel
-  org_id         String
-  organization   Organization         @relation(fields: [org_id], references: [clerk_id], onDelete: Cascade)
-  employee_id    String
-  employee_name  String               @default("")
-  employee_email String               @default("")
-  category       IssueCategory
-  messageHistory String               @db.LongText
-  status         IssueStatus
-  is_satisfied   Boolean
-  reason         String?
+  id              Int                  @id @default(autoincrement())
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
+  resolved_at     DateTime?
+  issue_id        String               @unique
+  conversation_id String
+  celery_task_id  String
+  user_id         String
+  user            User                 @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
+  org_name        String               @default("")
+  channel         CommunicationChannel
+  org_id          String
+  organization    Organization         @relation(fields: [org_id], references: [clerk_id], onDelete: Cascade)
+  employee_id     String
+  employee_name   String               @default("")
+  employee_email  String               @default("")
+  category        IssueCategory
+  messageHistory  String               @db.LongText
+  status          IssueStatus
+  is_satisfied    Boolean
+  reason          String?
 
   @@index([user_id])
   @@index([org_id])
@@ -105,23 +106,24 @@ model User {
   slack                  Slack?
   zendesk                Zendesk?
   organization           Organization @relation(fields: [organization_id], references: [clerk_id], onDelete: Cascade)
-  Issue                  Issue[]
+  issues                 Issue[]
 
   @@index([organization_id])
 }
 
 model Zendesk {
-  id            Int      @id @default(autoincrement())
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-  user_id       String   @unique
-  user          User     @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
-  access_token  String
-  subdomain     String   @unique
-  account_email String   @default("")
-  account_id    String   @default("")
-  guide         Boolean  @default(false)
-  support       Boolean  @default(false)
+  id              Int      @id @default(autoincrement())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  user_id         String   @unique
+  user            User     @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
+  access_token    String
+  subdomain       String
+  account_email   String   @default("")
+  account_id      String   @default("")
+  organization_id String   @default("")
+  guide           Boolean  @default(false)
+  support         Boolean  @default(false)
 
-  @@index([user_id, subdomain])
+  @@index([user_id])
 }

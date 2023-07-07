@@ -1,3 +1,5 @@
+from pprint import pprint
+
 from dotenv import load_dotenv
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -47,7 +49,7 @@ def shutdown_worker(**kwargs):
     print("Shutting down Prisma")
 
 
-def expired_conversation_callback(convo_id, token, channel):
+def expired_conversation_callback(convo_id, issue_id, token, channel):
     try:
         print("executing task....")
         r = Redis()
@@ -58,30 +60,30 @@ def expired_conversation_callback(convo_id, token, channel):
             response = client.chat_postMessage(channel=channel, text="Has this issue been resolved?")
             # Define the interactive message
             # Create an interactivity pointer for the "Yes" button
-            create_ticket_pointer = {
+            yes_pointer = {
                 "type": "button",
                 "text": {
                     "type": "plain_text",
                     "text": "Yes"
                 },
-                "value": convo_id,
+                "value": issue_id,
                 "style": "primary",
                 "action_id": "issue_resolved_yes"
             }
 
             # Create an interactivity pointer for the "No" button
-            cancel_pointer = {
+            no_pointer = {
                 "type": "button",
                 "text": {
                     "type": "plain_text",
                     "text": "No"
                 },
-                "value": convo_id,
+                "value": issue_id,
                 "style": "danger",
                 "action_id": "issue_resolved_no"
             }
             buttons = ActionsBlock(
-                elements=[create_ticket_pointer, cancel_pointer]
+                elements=[yes_pointer, no_pointer]
             )
             divider = DividerBlock()
             block = [divider, buttons]
@@ -92,7 +94,7 @@ def expired_conversation_callback(convo_id, token, channel):
                     text="New message",
                     blocks=block
                 )
-                print(response)
+                pprint(response)
             except SlackApiError as e:
                 print("Error posting message: {}".format(e))
             return True
@@ -109,7 +111,7 @@ def adding_task(x, y):
 
 
 @celery.task()
-def create_task(convo_id: str, token: str, channel: str, debug: bool = False):
+def create_task(convo_id: str, issue_id: str, token: str, channel: str, debug: bool = False):
     time.sleep(10 if debug else 300)
-    expired_conversation_callback(convo_id, token, channel)
+    expired_conversation_callback(convo_id, issue_id, token, channel)
     return {"message": "Success"}

@@ -16,6 +16,7 @@ from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
 from app.db.prisma_client import prisma
+from app.redis.client import Redis
 from app.utils.gpt import send_zendesk_ticket
 from app.utils.helpers import border_line
 from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id, fetch_access_token
@@ -192,25 +193,62 @@ async def handle_issue_resolved(ack: AsyncAck, body: dict, respond: AsyncRespond
     if not authorized:
         await respond(
             replace_original=False,
-            text=":x: It seems like you are not the author of this issue",
+            text=":x:  It seems like you are not the author of this issue",
         )
         return
     else:
-        # fetch the specific issue from the DB using the conversation_id attached in action payload
+        # fetch the specific issue from the and set the issue status to resolved
         issue = await prisma.issue.update(
             where={"issue_id": body["actions"][0]["value"]},
             data={"status": "resolved", "resolved_at": datetime.now()},
         )
+        r = Redis()
+        # delete the conversation_id from the redis cache
+        r.delete_key(issue.conversation_id)
         if issue:
             await respond(
+                replace_original=False,
+                text="How satisfied are you with my support on this issue?",
+                blocks=[
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                # storing the conversation_id in the block_id property of the action payload
+                                "block_id": f"{body['actions'][0]['value']}:true",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Satisfied",
+                                },
+                                "style": "primary",
+                                "value": "true",
+                                "action_id": "issue_satisfied_yes"
+                            },
+                            {
+                                "type": "button",
+                                # storing the conversation_id in the block_id property of the action payload
+                                "block_id": f"{body['actions'][0]['value']}:false",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Unsatisfied",
+                                },
+                                "style": "danger",
+                                "value": "false",
+                                "action_id": "issue_satisfied_no"
+                            }
+                        ]
+                    }
+                ]
+            )
+            await respond(
                 replace_original=True,
-                text=f":white_check_mark: Thank you. I have marked your issue as resolved. "
-                     f"\nHow satisfied are you with my support on this issue?"
+                text=f":white_check_mark:  Thank you. I have marked your issue as resolved. "
             )
         else:
             await respond(
                 replace_original=True,
-                text=f"Something went wrong while resolving your issue."
+                text=f"Something went wrong while resolving your issue.\n"
                      f"Your issue may have been marked as resolved by an administrator",
             )
 
@@ -223,7 +261,7 @@ async def handle_issue_not_resolved(ack: AsyncAck, body: dict, respond: AsyncRes
     if not authorized:
         await respond(
             replace_original=False,
-            text=":x: It seems like you are not the author of this issue",
+            text=":x:  It seems like you are not the author of this issue",
         )
         return
     else:
@@ -235,15 +273,17 @@ async def handle_issue_not_resolved(ack: AsyncAck, body: dict, respond: AsyncRes
         if issue:
             await respond(
                 replace_original=True,
-                text=f"I'm sorry to hear that I couldn't resolve your issue."
+                text=f"I'm sorry to hear that I couldn't resolve your issue.\n"
                      f"I have marked your issue as unresolved."
             )
             await respond(
+                replace_original=False,
                 blocks=[
                     {
                         "dispatch_action": True,
                         "type": "input",
-                        "block_id": "input123",
+                        # storing the conversation_id in the block_id property of the action payload
+                        "block_id": body["actions"][0]["value"],
                         "label": {
                             "type": "plain_text",
                             "text": "Please let me know why this issue is still unresolved?"
@@ -260,7 +300,7 @@ async def handle_issue_not_resolved(ack: AsyncAck, body: dict, respond: AsyncRes
         else:
             await respond(
                 replace_original=True,
-                text=f"Something went wrong while resolving your issue."
+                text=f"Something went wrong while resolving your issue.\n"
                      f"Your issue may have been marked as resolved by an administrator",
             )
 
@@ -269,12 +309,15 @@ async def handle_issue_not_resolved(ack: AsyncAck, body: dict, respond: AsyncRes
 async def handle_unresolved_reason(ack: AsyncAck, body: dict, respond: AsyncRespond):
     await ack()
     pprint(body)
+    border_line()
     reason = body["actions"][0]["text"]
+    issue_id = body["actions"][0]["block_id"]
     try:
         issue = await prisma.issue.update(
-            where={"issue_id": body["actions"][0]["value"]},
-            data={"unresolved_reason": reason},
+            where={"issue_id": issue_id},
+            data={"reason": reason},
         )
+        pprint(issue)
         await respond(
             replace_original=True,
             text=f":white_check_mark:  Thank you for your feedback! \n"

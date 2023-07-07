@@ -54,3 +54,8 @@ class ZendeskKBPayload(BaseModel):
     token: str
     subdomain: str
     email: str
+
+
+class DeleteKBPayload(BaseModel):
+    email: str
+
