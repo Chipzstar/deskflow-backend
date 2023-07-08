@@ -12,7 +12,8 @@ from slack_bolt.context.respond.async_respond import AsyncRespond
 from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from slack_sdk.models.blocks import DividerBlock, SectionBlock, ActionsBlock, ButtonElement, InputBlock, PlainTextObject, PlainTextInputElement
+from slack_sdk.models.blocks import DividerBlock, SectionBlock, ActionsBlock, ButtonElement, InputBlock, \
+    PlainTextObject, PlainTextInputElement, UserSelectElement
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
@@ -84,7 +85,6 @@ async def handle_user_select(ack: AsyncAck, body: dict, respond: AsyncRespond):
             print("app_id" in message)
             if "user" in message and "app_id" not in message:
                 last_message = message
-                user = get_user_from_id(last_message["user"], client)
                 response = client.chat_postMessage(
                     text=f"Hello {recipient['first_name']}, <@{last_message['user']}> wants to know:\n",
                     channel=selected_user_id,
@@ -170,19 +170,16 @@ async def handle_contact_support(ack: AsyncAck, body: dict, respond: AsyncRespon
         )
         return
     else:
+        section = SectionBlock(
+            block_id="section678",
+            text="Select an employee from the dropdown list",
+            accessory=UserSelectElement(
+                action_id="user_select",
+                placeholder=PlainTextObject(text="Which employee would you like to contact?", emoji=True)
+            )
+        )
         await respond(
-            blocks=[
-                {
-                    "type": "section",
-                    "block_id": "section678",
-                    "text": {"type": "mrkdwn", "text": "Select an employee from the dropdown list"},
-                    "accessory": {
-                        "action_id": "user_select",
-                        "type": "users_select",
-                        "placeholder": {"type": "plain_text", "text": "Which employee would you like to contact?"},
-                    },
-                }
-            ]
+            blocks=[section]
         )
 
 
@@ -365,7 +362,7 @@ async def handle_issue_satisfied(ack: AsyncAck, body: dict, respond: AsyncRespon
 
 
 @app.action({"action_id": "issue_satisfied_no"})
-async def handle_issue_satisfied(ack: AsyncAck, body: dict, respond: AsyncRespond):
+async def handle_issue_not_satisfied(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
     await ack()
     pprint(body)
