@@ -3,7 +3,7 @@ from pprint import pprint
 from dotenv import load_dotenv
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from slack_sdk.models.blocks import ActionsBlock, DividerBlock
+from slack_sdk.models.blocks import ActionsBlock, DividerBlock, ButtonElement
 
 load_dotenv()
 
@@ -14,7 +14,7 @@ import time
 from celery import Celery
 from redis.exceptions import ResponseError, RedisError
 from app.redis.client import Redis
-from celery.signals import  worker_shutdown, celeryd_after_setup, worker_process_init
+from celery.signals import worker_shutdown, celeryd_after_setup, worker_process_init
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,6 @@ if os.environ.get("DOPPLER_ENVIRONMENT") == "prd":
     celery.conf.broker_use_ssl = {
         'ssl_cert_reqs': ssl.CERT_NONE
     }
-
 
 
 @celeryd_after_setup.connect
@@ -60,28 +59,9 @@ def expired_conversation_callback(convo_id, issue_id, token, channel):
             response = client.chat_postMessage(channel=channel, text="Has this issue been resolved?")
             # Define the interactive message
             # Create an interactivity pointer for the "Yes" button
-            yes_pointer = {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": "Yes"
-                },
-                "value": issue_id,
-                "style": "primary",
-                "action_id": "issue_resolved_yes"
-            }
-
+            yes_pointer = ButtonElement(text="Yes", action_id="issue_resolved_yes", style="primary", value=issue_id)
             # Create an interactivity pointer for the "No" button
-            no_pointer = {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": "No"
-                },
-                "value": issue_id,
-                "style": "danger",
-                "action_id": "issue_resolved_no"
-            }
+            no_pointer = ButtonElement(text="No", action_id="issue_resolved_no", style="danger", value=issue_id)
             buttons = ActionsBlock(
                 elements=[yes_pointer, no_pointer]
             )

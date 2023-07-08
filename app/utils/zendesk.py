@@ -13,8 +13,6 @@ from zenpy import Zenpy
 
 # GLOBAL VARIABLES
 MAX_INPUT_TOKENS = 8191
-COMPLETIONS_MODEL = "text-davinci-003"
-CHAT_COMPLETIONS_MODEL = "gpt-3.5-turbo"
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
 ZENDESK_API_KEY = os.environ["ZENDESK_API_KEY"]
