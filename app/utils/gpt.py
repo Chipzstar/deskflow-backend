@@ -23,7 +23,7 @@ zendesk_api_key = os.environ["ZENDESK_API_KEY"]
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
 MAX_INPUT_TOKENS = 8191
 COMPLETIONS_MODEL = "text-davinci-003"
-CHAT_COMPLETIONS_MODEL = "gpt-3.5-turbo"
+CHAT_COMPLETIONS_MODEL = "gpt-4"
 BATCH_SIZE = 1000  # you can submit up to 2048 embedding inputs per request
 ZENDESK_TICKET_FORMAT_PROMPT = f"""You are an AI assistant that converts customer queries into Zendesk support tickets. 
 
@@ -198,9 +198,7 @@ async def send_zendesk_ticket(
     zendesk: Zendesk,
     system_message: str = "You are a Zendesk support ticket creator",
 ):
-    border_asterisk()
-    pprint(query)
-    border_asterisk()
+    border_asterisk(query)
     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
             
             QUERY: {query}

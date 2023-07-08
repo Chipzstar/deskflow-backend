@@ -12,14 +12,16 @@ from slack_bolt.context.respond.async_respond import AsyncRespond
 from slack_bolt.oauth.async_oauth_settings import AsyncOAuthSettings
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.models.blocks import DividerBlock, SectionBlock, ActionsBlock, ButtonElement, InputBlock, PlainTextObject, PlainTextInputElement
 from slack_sdk.oauth.installation_store import FileInstallationStore
 from slack_sdk.oauth.state_store import FileOAuthStateStore
 
 from app.db.prisma_client import prisma
 from app.redis.client import Redis
 from app.utils.gpt import send_zendesk_ticket
-from app.utils.helpers import border_line
-from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id, fetch_access_token
+from app.utils.helpers import border_line, border_asterisk
+from app.utils.slack import get_user_from_id, display_plain_text_dialog, get_profile_from_id, fetch_access_token, \
+    installation_base_dir
 from app.utils.types import Profile
 
 router = APIRouter()
@@ -35,7 +37,7 @@ oauth_settings = AsyncOAuthSettings(
     client_id=SLACK_CLIENT_ID,
     client_secret=SLACK_CLIENT_SECRET,
     scopes=SLACK_APP_SCOPES,
-    installation_store=FileInstallationStore(base_dir=f"{os.getcwd()}/app/data/installations"),
+    installation_store=FileInstallationStore(base_dir=installation_base_dir),
     state_store=FileOAuthStateStore(expiration_seconds=600, base_dir=f"{os.getcwd()}/app/data/states"),
 )
 
@@ -49,7 +51,7 @@ async def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
     token = await fetch_access_token(body["team"]["id"], logging.Logger)
     client = WebClient(token=token)
     profile = get_profile_from_id(user_id, client)
-    conversation = client.conversations_history(channel=body["channel"]["id"], limit=3)
+    conversation = client.conversations_history(channel=body["channel"]["id"], limit=5)
     for message in conversation.data['messages']:
         border_line()
         print(message['text'][:100])
@@ -59,7 +61,7 @@ async def validate_user(body: dict) -> Tuple[bool, Profile | None, str]:
             continue
         # Validate that the user that clicked the button matches the user that posted the question
         return user_id == message["user"], profile, message['text']
-    return False, profile, conversation.data['messages'][2]['text']
+    return False, profile, conversation.data['messages'][4]['text']
 
 
 @app.action({"action_id": "user_select"})
@@ -120,6 +122,7 @@ async def handle_reply_support(ack: AsyncAck, body: dict, respond: AsyncRespond)
 async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond):
     # Acknowledge the action request
     await ack()
+    pprint(body)
     authorized, profile, last_message = await validate_user(body)
     if not authorized:
         await respond(
@@ -197,49 +200,48 @@ async def handle_issue_resolved(ack: AsyncAck, body: dict, respond: AsyncRespond
         )
         return
     else:
+        issue_id = body["actions"][0]["value"]
+        border_asterisk(issue_id)
         # fetch the specific issue from the and set the issue status to resolved
         issue = await prisma.issue.update(
-            where={"issue_id": body["actions"][0]["value"]},
-            data={"status": "resolved", "resolved_at": datetime.now()},
+            where={"issue_id": issue_id},
+            data={"status": "resolved", "resolved_at": datetime.now(), "is_satisfied": True},
         )
         r = Redis()
         # delete the conversation_id from the redis cache
         r.delete_key(issue.conversation_id)
         if issue:
+            # storing the conversation_id in the block_id property of the action payload
+            section = SectionBlock(
+                text=PlainTextObject(text="How satisfied are you with my support on this issue?", emoji=True),
+            )
+            divider = DividerBlock()
+            actions = ActionsBlock(
+                block_id=issue_id,
+                elements=[
+                    ButtonElement(
+                        text={
+                            "type": "plain_text",
+                            "text": "Satisfied",
+                        },
+                        style="primary",
+                        value="true",
+                        action_id="issue_satisfied_yes"
+                    ),
+                    ButtonElement(
+                        text={
+                            "type": "plain_text",
+                            "text": "Unsatisfied",
+                        },
+                        style="danger",
+                        value="false",
+                        action_id="issue_satisfied_no"
+                    )
+                ]
+            )
             await respond(
                 replace_original=False,
-                text="How satisfied are you with my support on this issue?",
-                blocks=[
-                    {
-                        "type": "actions",
-                        "elements": [
-                            {
-                                "type": "button",
-                                # storing the conversation_id in the block_id property of the action payload
-                                "block_id": f"{body['actions'][0]['value']}:true",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "Satisfied",
-                                },
-                                "style": "primary",
-                                "value": "true",
-                                "action_id": "issue_satisfied_yes"
-                            },
-                            {
-                                "type": "button",
-                                # storing the conversation_id in the block_id property of the action payload
-                                "block_id": f"{body['actions'][0]['value']}:false",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "Unsatisfied",
-                                },
-                                "style": "danger",
-                                "value": "false",
-                                "action_id": "issue_satisfied_no"
-                            }
-                        ]
-                    }
-                ]
+                blocks=[section, divider, actions]
             )
             await respond(
                 replace_original=True,
@@ -266,10 +268,15 @@ async def handle_issue_not_resolved(ack: AsyncAck, body: dict, respond: AsyncRes
         return
     else:
         # fetch the specific issue from the DB using the conversation_id attached in action payload
+        issue_id = body["actions"][0]["value"]
+        border_asterisk(issue_id)
         issue = await prisma.issue.update(
-            where={"issue_id": body["actions"][0]["value"]},
+            where={"issue_id": issue_id},
             data={"status": "unresolved", "resolved_at": datetime.now()},
         )
+        r = Redis()
+        # delete the conversation_id from the redis cache
+        r.delete_key(issue.conversation_id)
         if issue:
             await respond(
                 replace_original=True,
@@ -279,22 +286,16 @@ async def handle_issue_not_resolved(ack: AsyncAck, body: dict, respond: AsyncRes
             await respond(
                 replace_original=False,
                 blocks=[
-                    {
-                        "dispatch_action": True,
-                        "type": "input",
-                        # storing the conversation_id in the block_id property of the action payload
-                        "block_id": body["actions"][0]["value"],
-                        "label": {
-                            "type": "plain_text",
-                            "text": "Please let me know why this issue is still unresolved?"
-                        },
-                        "element": {
-                            "type": "plain_text_input",
-                            "action_id": "unresolved_reason",
-                            "multiline": True,
-                            "placeholder": {"type": "plain_text", "text": "Enter your reason"}
-                        }
-                    }
+                    InputBlock(
+                        block_id=issue_id,
+                        dispatch_action=True,
+                        label=PlainTextObject(text="Please let me know why this issue is still resolved?"),
+                        element=PlainTextInputElement(
+                            action_id="unresolved_reason",
+                            multiline=True,
+                            placeholder=PlainTextObject(text="Enter your reason")
+                        )
+                    )
                 ]
             )
         else:
@@ -310,8 +311,14 @@ async def handle_unresolved_reason(ack: AsyncAck, body: dict, respond: AsyncResp
     await ack()
     pprint(body)
     border_line()
-    reason = body["actions"][0]["text"]
+    reason = body["actions"][0]["value"]
     issue_id = body["actions"][0]["block_id"]
+    if not len(reason):
+        await respond(
+            replace_original=False,
+            text=f":x:  Please enter a reason for this issue to be marked as unresolved"
+        )
+        return
     try:
         issue = await prisma.issue.update(
             where={"issue_id": issue_id},
@@ -323,6 +330,63 @@ async def handle_unresolved_reason(ack: AsyncAck, body: dict, respond: AsyncResp
             text=f":white_check_mark:  Thank you for your feedback! \n"
         )
     except SlackApiError as e:
+        await respond(
+            replace_original=True,
+            text=f":x:  Oops! Something went wrong while recording your reason.\n"
+                 f"Your issue has been marked as unresolved. Please feel free to ask me any HR or IT questions",
+        )
+        print(f"Error sending message: {e}")
+
+
+@app.action({"action_id": "issue_satisfied_yes"})
+async def handle_issue_satisfied(ack: AsyncAck, body: dict, respond: AsyncRespond):
+    # Acknowledge the action request
+    await ack()
+    pprint(body)
+    issue_id = body["actions"][0]["block_id"]
+    # fetch the specific issue from the DB using the conversation_id attached in action payload
+    try:
+        issue = await prisma.issue.update(
+            where={"issue_id": issue_id},
+            data={"is_satisfied": True},
+        )
+        if issue:
+            await respond(
+                replace_original=True,
+                text=f":white_check_mark:  Thank you for your feedback! \n"
+            )
+    except SlackApiError as e:
+        await respond(
+            replace_original=True,
+            text=f":x:  Oops! Something went wrong.\n"
+                 f"Your issue has been marked as resolved. Please feel free to ask me any HR or IT questions",
+        )
+        print(f"Error sending message: {e}")
+
+
+@app.action({"action_id": "issue_satisfied_no"})
+async def handle_issue_satisfied(ack: AsyncAck, body: dict, respond: AsyncRespond):
+    # Acknowledge the action request
+    await ack()
+    pprint(body)
+    issue_id = body["actions"][0]["block_id"]
+    # fetch the specific issue from the DB using the conversation_id attached in action payload
+    try:
+        issue = await prisma.issue.update(
+            where={"issue_id": issue_id},
+            data={"is_satisfied": False},
+        )
+        if issue:
+            await respond(
+                replace_original=True,
+                text=f":white_check_mark:  Thank you for your feedback! \n"
+            )
+    except SlackApiError as e:
+        await respond(
+            replace_original=True,
+            text=f":x:  Oops! Something went wrong.\n"
+                 f"Your issue has been marked as unresolved. Please feel free to ask me any HR or IT questions",
+        )
         print(f"Error sending message: {e}")
 
 
