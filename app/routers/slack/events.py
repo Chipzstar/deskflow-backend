@@ -76,9 +76,9 @@ async def generate_reply(
     if slack is None:
         logger.error(f"Slack not found for team {event['team']}")
         return "", None, [], None
-    user = await prisma.user.find_unique(where={"clerk_id": slack.user_id})
+    org = await prisma.organization.find_unique(where={"clerk_id": slack.org_id})
     slack_profile = get_profile_from_id(event["user"], client)
-    logger.debug(user)
+    logger.debug(org)
     thread_ts = event.get("thread_ts", None)
     # initially return a message that Alfred is thinking and store metadata for that message
     logger.debug(f"IN_THREAD: {reply_in_thread}")

@@ -138,7 +138,7 @@ async def handle_create_ticket(ack: AsyncAck, body: dict, respond: AsyncRespond)
         # fetch user from the DB
         slack = await prisma.slack.find_first(where={"team_id": body["team"]["id"]})
         # fetch zendesk config for the user in DB
-        zendesk = await prisma.zendesk.find_first(where={"user_id": slack.user_id})
+        zendesk = await prisma.zendesk.find_first(where={"org_id": slack.org_id})
         # Create a Zendesk support ticket using the data from the action payload
         ticket = await send_zendesk_ticket(last_message, profile, zendesk)
         if ticket:
