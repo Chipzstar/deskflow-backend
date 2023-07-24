@@ -42,8 +42,6 @@ model Issue {
   issue_id        String               @unique
   conversation_id String
   celery_task_id  String
-  user_id         String
-  user            User                 @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
   org_name        String               @default("")
   channel         CommunicationChannel
   org_id          String
@@ -57,73 +55,78 @@ model Issue {
   is_satisfied    Boolean
   reason          String?
 
-  @@index([user_id])
   @@index([org_id])
 }
 
 model Organization {
-  id         Int      @id @default(autoincrement())
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  clerk_id   String   @unique
-  name       String   @default("")
-  slug       String   @default("")
-  users      User[]
-  issues     Issue[]
+  id                    Int      @id @default(autoincrement())
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  clerk_id              String   @unique
+  name                  String   @default("")
+  slug                  String   @default("")
+  slack_auth_state_id   String   @default("")
+  zendesk_auth_state_id String   @default("")
+  users                 User[]
+  issues                Issue[]
+  slack                 Slack?
+  zendesk               Zendesk?
 }
 
 model Slack {
-  id               Int      @id @default(autoincrement())
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
-  user_id          String   @unique
-  user             User     @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
-  access_token     String   @default("")
-  team_id          String   @default("")
-  team_name        String   @default("")
-  bot_id           String   @default("")
-  bot_access_token String   @default("")
-  scopes           String   @default("")
+  id               Int          @id @default(autoincrement())
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+  org_id           String       @unique
+  organization     Organization @relation(fields: [org_id], references: [clerk_id], onDelete: Cascade)
+  access_token     String       @default("")
+  team_id          String       @default("")
+  team_name        String       @default("")
+  bot_id           String       @default("")
+  bot_access_token String       @default("")
+  scopes           String       @default("")
 
-  @@index([user_id])
+  @@index([org_id])
+}
+
+enum OrganizationRole {
+  admin
+  manager
+  member
 }
 
 model User {
-  id                     Int          @id @default(autoincrement())
-  created_at             DateTime     @default(now())
-  updated_at             DateTime     @updatedAt
-  clerk_id               String       @unique
-  organization_id        String       @default("")
-  email                  String       @unique
+  id                     Int              @id @default(autoincrement())
+  created_at             DateTime         @default(now())
+  updated_at             DateTime         @updatedAt
+  clerk_id               String           @unique
+  organization_id        String           @default("")
+  email                  String           @unique
   firstname              String
   lastname               String
   fullname               String
   stripe_customer_id     String?
   stripe_payment_method  String?
   stripe_subscription_id String?
-  slack_auth_state_id    String       @default("")
-  zendesk_auth_state_id  String       @default("")
-  slack                  Slack?
-  zendesk                Zendesk?
-  organization           Organization @relation(fields: [organization_id], references: [clerk_id], onDelete: Cascade)
-  issues                 Issue[]
+  organization           Organization     @relation(fields: [organization_id], references: [clerk_id], onDelete: Cascade)
+  role                   OrganizationRole @default(value: admin)
 
   @@index([organization_id])
 }
 
 model Zendesk {
-  id              Int      @id @default(autoincrement())
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-  user_id         String   @unique
-  user            User     @relation(fields: [user_id], references: [clerk_id], onDelete: Cascade)
-  access_token    String
-  subdomain       String
-  account_email   String   @default("")
-  account_id      String   @default("")
-  organization_id String   @default("")
-  guide           Boolean  @default(false)
-  support         Boolean  @default(false)
+  id            Int          @id @default(autoincrement())
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+  org_id        String       @unique
+  organization  Organization @relation(fields: [org_id], references: [clerk_id], onDelete: Cascade)
+  access_token  String
+  subdomain     String
+  account_email String       @default("")
+  account_id    String       @default("")
+  guide         Boolean      @default(false)
+  support       Boolean      @default(false)
+  active        Boolean      @default(true)
 
-  @@index([user_id])
+  @@index([org_id])
 }
