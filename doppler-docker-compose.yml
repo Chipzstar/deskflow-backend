@@ -40,7 +40,7 @@ services:
     build: .
     command: celery -A app.worker --broker=redis://redis:6379/0 flower --port=5555
     ports:
-      - "5555:5555"
+      - "8082:5555"
     environment:
       - DOPPLER_ENVIRONMENT=dev
       - FLOWER_UNAUTHENTICATED_API=true

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from slack_sdk import WebClient
 from slack_sdk.oauth.installation_store import FileInstallationStore, Installation
 from app.db.prisma_client import prisma
-from prisma.models import User
+from prisma.models import Organization
 from app.utils.slack import installation_base_dir
 from app.utils.types import OAuthPayload
 
@@ -22,12 +22,11 @@ CLIENT_HOST = os.environ.get("CLIENT_HOST", None)
 installation_store = FileInstallationStore(base_dir=installation_base_dir)
 
 
-async def verify_state(state: str) -> Tuple[User, bool]:
-    # user = get_user_by_slack_state(db=db, state=state)
-    user = await prisma.user.find_first(where={"slack_auth_state_id": state})
-    verified = bool(user)
+async def verify_state(state: str) -> Tuple[Organization, bool]:
+    org = await prisma.organization.find_first(where={"slack_auth_state_id": state})
+    verified = bool(org)
     print(f"verified: {verified}")
-    return user, bool(verified)
+    return org, bool(verified)
 
 
 @router.post("/oauth/callback")
@@ -35,7 +34,7 @@ async def oauth_callback(payload: OAuthPayload):
     pprint(payload)
     # Retrieve the auth code and state from the request params
     if payload.code:
-        user, verified = await verify_state(payload.state)
+        org, verified = await verify_state(payload.state)
         # Verify the state parameter
         if verified:
             client = WebClient()  # no prepared token needed for this
@@ -88,11 +87,11 @@ async def oauth_callback(payload: OAuthPayload):
             # Store the installation
             installation_store.save(installation)
             # search for slack entity in DB
-            slack = await prisma.slack.find_first(where={"user_id": user.clerk_id})
+            slack = await prisma.slack.find_first(where={"org_id": org.clerk_id})
             if slack is None:
                 slack = await prisma.slack.create(
                     data={
-                        "user_id": user.clerk_id,
+                        "org_id": org.clerk_id,
                         "access_token": bot_token,
                         "team_id": installed_team.get("id"),
                         "team_name": installed_team.get("name"),
@@ -103,7 +102,7 @@ async def oauth_callback(payload: OAuthPayload):
                 )
             else:
                 slack = await prisma.slack.update(
-                    where={"user_id": user.clerk_id},
+                    where={"org_id": org.clerk_id},
                     data={
                         "access_token": bot_token,
                         "team_id": installed_team.get("id"),
