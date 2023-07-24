@@ -43,6 +43,7 @@ from app.worker import create_task
 
 router = APIRouter()
 
+ENVIRONMENT = os.environ.get("DOPPLER_ENVIRONMENT", "dev")
 SLACK_APP_TOKEN = os.environ["SLACK_APP_TOKEN"]
 SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
 SLACK_CLIENT_ID = os.environ["SLACK_CLIENT_ID"]
@@ -120,7 +121,7 @@ async def generate_reply(
     message = remove_custom_delimiters(raw_message).strip()
     print(f"\nMESSAGE:\t {message}")
     # download knowledge base embeddings from pinecone namespace
-    knowledge_base = get_vector_embeddings_from_pinecone("alfred", user.email)
+    knowledge_base = get_vector_embeddings_from_pinecone("alfred", org.slug)
     # create query embedding and fetch relatedness between query and knowledge base in dataframe
     similarities = await get_similarities(message, knowledge_base)
     # Combine all top n answers into one chunk of text to use as knowledge base context for GPT
@@ -158,7 +159,7 @@ async def generate_reply(
     r.add_to_cache(conversation_id, json.dumps(messages), ONE_HOUR_IN_SECONDS)
     # schedule a worker job to send a message to the user that the conversation is now finished after the
     # cache expires
-    task = create_task.delay(conversation_id, issue_id, token, event["channel"], True)
+    task = create_task.delay(conversation_id, issue_id, token, event["channel"], ENVIRONMENT == "dev")
     category = classify_issue(message)
     # create reference to the start of the issue in the DB or update the issue if already exists
     if not len(history):
@@ -166,7 +167,7 @@ async def generate_reply(
             conversation_id,
             issue_id,
             task.id,
-            user,
+            org,
             slack_profile,
             event["user"],
             category,
@@ -182,7 +183,7 @@ async def generate_reply(
             category,
             messages
         )
-    return reply, response.data, messages, user
+    return reply, response.data, messages, org
 
 
 async def check_bot_mentioned_in_thread(

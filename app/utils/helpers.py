@@ -84,7 +84,7 @@ def get_dataframe_from_csv(path: str, filename) -> pd.DataFrame:
     return df
 
 
-def get_vector_embeddings_from_pinecone(index_name: str, namespace: str = "chipzstar.dev@googlemail.com"):
+def get_vector_embeddings_from_pinecone(index_name: str, namespace: str = "kiasma"):
     titles = []
     content = []
     categories = []
@@ -139,7 +139,10 @@ def check_reply_requires_action(reply: str, messages: List[Dict[str, str]]):
 
 def check_can_create_ticket(reply: str, messages: List[Dict[str, str]]):
     ticket_hints = ["SUBJECT:", "BODY:", "PRIORITY:"]
-    general_hints = ["Thank you for confirming", "I have created a Zendesk ticket"]
+    general_hints = [
+        "Thank you for confirming",
+        "I have created a Zendesk ticket",
+        "I will now proceed to create the Zendesk ticket"]
     # for hint in ticket_hints:
     #     if hint.lower() not in reply.lower():
     #         return False

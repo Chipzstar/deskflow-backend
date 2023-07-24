@@ -52,7 +52,7 @@ def integrate_kb(payload: ZendeskKBPayload):
     # Connect to the "Alfred" index
     index = pinecone.Index("alfred")
     # Insert the vector embeddings into the index
-    store_embeddings_into_pinecone(df, index, payload.email)
+    store_embeddings_into_pinecone(df, index, payload.slug)
     return {"status": "COMPLETE"}
 
 
@@ -63,8 +63,8 @@ def delete_kb(payload: DeleteKBPayload):
     index = pinecone.Index("alfred")
     index_stats = index.describe_index_stats()
     # extract the total_vector_count
-    num_vectors = int(index_stats["namespaces"][payload.email]["vector_count"])
+    num_vectors = int(index_stats["namespaces"][payload.slug]["vector_count"])
     # Use vector count to fetch all vectors in the index
     ids = [str(x) for x in range(0, num_vectors)]
-    index.delete(ids=ids, namespace=payload.email)
-    return {"status": "Success", "message": f"Vectors deleted for namespace {payload.email}!"}
+    index.delete(ids=ids, namespace=payload.slug)
+    return {"status": "Success", "message": f"Vectors deleted for namespace {payload.slug}!"}

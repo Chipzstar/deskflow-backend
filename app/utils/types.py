@@ -53,9 +53,9 @@ class OAuthPayload(BaseModel):
 class ZendeskKBPayload(BaseModel):
     token: str
     subdomain: str
-    email: str
+    slug: str
 
 
 class DeleteKBPayload(BaseModel):
-    email: str
+    slug: str
 

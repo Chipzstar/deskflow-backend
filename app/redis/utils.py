@@ -1,16 +1,14 @@
-import json
+from pprint import pprint
 from pprint import pprint
 from typing import Literal, List, Dict
 
 from celery.result import AsyncResult
-from prisma.models import User
+from prisma.models import Organization
 from redis.exceptions import ResponseError, RedisError
 from slack_sdk import WebClient
 
 from app.db.prisma_client import prisma
-from app.redis.client import Redis
-from app.utils.helpers import ONE_DAY_IN_SECONDS, ONE_HOUR_IN_SECONDS, TWO_DAYS_IN_SECONDS
-from app.utils.slack import get_conversation_id, get_profile_from_id
+from app.utils.slack import get_conversation_id
 from app.utils.types import Profile
 
 
@@ -55,18 +53,14 @@ async def create_issue(
         conversation_id: str,
         issue_id: str,
         task_id: str,
-        user: User,
+        org: Organization,
         slack_profile: Profile,
         employee_id: str,
         category: str,
         messages: List[Dict[str, str]]
 ):
-    org = await prisma.organization.find_unique(
-        where={"clerk_id": user.organization_id}
-    )
     return await prisma.issue.create(
         data={
-            "user_id": user.clerk_id,
             "issue_id": issue_id,
             "conversation_id": conversation_id,
             "celery_task_id": task_id,

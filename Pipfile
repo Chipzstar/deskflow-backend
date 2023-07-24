@@ -13,6 +13,7 @@ celery = "celery -A app.worker worker --loglevel=info --logfile=app/logs/celery.
 flower = "celery -A app.worker --broker=redis://localhost:6379/0 flower --port=5555"
 doppler-ephemeral-token = "sh -c 'export DOPPLER_TOKEN=\"$(doppler configs tokens create dev --plain --max-age 1m)\"'"
 doppler-service-token = "sh -c 'export DOPPLER_SERVICE_TOKEN=\"$(doppler configs tokens create --project deskflow-backend --config dev worker-dev-token --plain --max-age 1m)\"'"
+ngrok = "sh -c 'ngrok http 8080 --region=eu --domain=painfully-classic-egret.ngrok-free.app --config=\"/Users/chiso/Library/Application Support/ngrok/ngrok2.yml\"'"
 
 [packages]
 openai = "*"

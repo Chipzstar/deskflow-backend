@@ -3,12 +3,11 @@ from pprint import pprint
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from slack_sdk.models.blocks import SectionBlock, ActionsBlock, DividerBlock
+from slack_sdk.models.blocks import ActionsBlock, DividerBlock, ButtonElement, PlainTextObject, \
+    InputBlock, PlainTextInputElement
 
 from app.db.prisma_client import prisma
-from app.utils.helpers import border_asterisk
 from app.utils.types import Profile
-
 
 installation_base_dir = (
     f"{os.getcwd()}/app/data/installations"
@@ -18,18 +17,22 @@ installation_base_dir = (
 
 
 async def display_plain_text_dialog(
-    question: str, sender_id: str, recipient_name: str, client: WebClient, response
+        question: str, sender_id: str, recipient_name: str, client: WebClient, response
 ):
     pprint(response)
-    blocks = [
-        {
-            "type": "input",
-            "dispatch_action": True,
-            "block_id": sender_id,
-            "element": {"type": "plain_text_input", "action_id": "reply_support"},
-            "label": {"type": "plain_text", "text": question, "emoji": True},
-        }
-    ]
+    input_block = InputBlock(
+        block_id=sender_id,
+        label={
+            "type": "plain_text",
+            "text": question,
+            "emoji": True
+        },
+        element=PlainTextInputElement(
+            action_id="reply_support"
+        ),
+        dispatch_action=True
+    )
+    blocks = [input_block]
     # Post a message to a user using the interactivity pointer
     try:
         response = client.chat_postMessage(
@@ -44,20 +47,17 @@ def display_support_dialog(client: WebClient, response):
     print("TAKING ACTION!!!!")
     # Define the interactive message
     # Create an interactivity pointer for the "Create ticket" button
-    create_ticket_pointer = {
-        "type": "button",
-        "text": {"type": "plain_text", "text": "Create ticket"},
-        "style": "primary",
-        "action_id": "create_ticket",
-    }
-
+    create_ticket_pointer = ButtonElement(
+        text=PlainTextObject(text="Create ticket"),
+        action_id="create_ticket",
+        style="primary"
+    )
     # Create an interactivity pointer for the "Cancel" button
-    cancel_pointer = {
-        "type": "button",
-        "text": {"type": "plain_text", "text": "Contact HR/IT Support"},
-        "style": "danger",
-        "action_id": "contact_support",
-    }
+    cancel_pointer = ButtonElement(
+        text="Contact HR/IT Support",
+        action_id="contact_support",
+        style="danger"
+    )
     buttons = ActionsBlock(elements=[create_ticket_pointer, cancel_pointer])
     divider = DividerBlock()
     block = [divider, buttons]

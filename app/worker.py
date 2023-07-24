@@ -92,6 +92,6 @@ def adding_task(x, y):
 
 @celery.task()
 def create_task(convo_id: str, issue_id: str, token: str, channel: str, debug: bool = False):
-    time.sleep(10 if debug else 300)
+    time.sleep(60 if debug else 300)
     expired_conversation_callback(convo_id, issue_id, token, channel)
     return {"message": "Success"}
