@@ -1,23 +1,25 @@
 import json
 import os
+import random
 from pprint import pprint
 from typing import List, Dict, Literal
 
-import random
+import httpx
 import numpy as np
 import openai
 import pandas as pd
 import tiktoken
-import httpx, asyncio
 from openai.embeddings_utils import cosine_similarity, get_embedding
 from prisma.models import Zendesk
 
 from app.utils.helpers import convert_csv_embeddings_to_floats, validate_ticket_object, border_asterisk, border_line
 from app.utils.types import Message, Profile, ZendeskOAuthCredentials
 
+openai.api_base = "https://oai.hconeai.com/v1"
 openai.api_key = os.environ["OPENAI_API_KEY"]
 openai.organization = os.environ["OPENAI_ORG_ID"]
 zendesk_api_key = os.environ["ZENDESK_API_KEY"]
+helicone_api_key = os.environ["HELICONE_API_KEY"]
 
 # DECLARE GLOBAL VARIABLES #
 EMBEDDING_MODEL = "text-embedding-ada-002"  # OpenAI's best embeddings as of Apr 2023
@@ -68,7 +70,7 @@ def num_tokens_from_text(string: str, encoding_name: str = "cl100k_base") -> int
 
 
 def strings_ranked_by_relatedness_from_csv(
-    query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
+        query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
 ) -> tuple[list[str], list[float], list[np.ndarray]]:
     """Returns a list of strings and relatednesses, sorted from most related to least."""
     question_vector = get_embedding(query, EMBEDDING_MODEL)
@@ -87,7 +89,7 @@ def strings_ranked_by_relatedness_from_csv(
 
 
 def strings_ranked_by_relatedness_from_pinecone(
-    query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
+        query: str, df: pd.DataFrame, relatedness_fn=lambda x, y: cosine_similarity(x, y), top_n: int = 100
 ) -> tuple[list[str], list[float], list[np.ndarray]]:
     """Returns a list of strings and relatednesses, sorted from most related to least."""
     question_vector = get_embedding(query, EMBEDDING_MODEL)
@@ -101,7 +103,7 @@ def strings_ranked_by_relatedness_from_pinecone(
 
 
 async def get_similarities(
-    query: str, df: pd.DataFrame, source: Literal["csv", "pinecone"] = "pinecone"
+        query: str, df: pd.DataFrame, source: Literal["csv", "pinecone"] = "pinecone"
 ) -> pd.DataFrame:
     SCORES = []
     ANSWERS = []
@@ -159,24 +161,32 @@ Please feel free to answer any HR or IT related questions."""
 
 
 async def generate_gpt_chat_response(
-    question: str,
-    context: str,
-    sender_name: str = "Ola",
-    company: str = "Omnicentra"
+        question: str,
+        context: str,
+        sender_name: str = "Ola",
+        company: str = "Omnicentra"
 ):
     message = query_message(question, context, company, MAX_INPUT_TOKENS, sender_name)
     messages = [
-        {"role": "system", "content": f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at {company}"},
+        {"role": "system",
+         "content": f"Your name is Alfred. You are a helpful assistant that answers HR and IT questions at {company}"},
         {"role": "user", "content": message},
     ]
-    response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
+    response = openai.ChatCompletion.create(
+        model=CHAT_COMPLETIONS_MODEL,
+        messages=messages,
+        temperature=0,
+        headers={
+            "Helicone-Auth": f"Bearer {helicone_api_key}",
+        }
+    )
     sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
     messages.append({"role": "assistant", "content": sanitized_response})
     return sanitized_response, messages
 
 
 async def continue_chat_response(
-    query: str, context: str, messages: List[Dict[str, str]], is_question: bool = False
+        query: str, context: str, messages: List[Dict[str, str]], is_question: bool = False
 ) -> object:
     if is_question:
         message = Message(role="user", content=f"{query}\n\nContext: {context}")
@@ -186,17 +196,24 @@ async def continue_chat_response(
     print(message.to_dict())
     print("*" * 100)
     messages.append(message.to_dict())
-    response = openai.ChatCompletion.create(model=CHAT_COMPLETIONS_MODEL, messages=messages, temperature=0)
+    response = openai.ChatCompletion.create(
+        model=CHAT_COMPLETIONS_MODEL,
+        messages=messages,
+        temperature=0,
+        headers={
+            "Helicone-Auth": f"Bearer {helicone_api_key}",
+        }
+    )
     sanitized_response = response['choices'][0]['message']['content'].strip(" \n").strip(" \n")
     messages.append({"role": "assistant", "content": sanitized_response})
     return sanitized_response, messages
 
 
 async def send_zendesk_ticket(
-    query: str,
-    profile: Profile,
-    zendesk: Zendesk,
-    system_message: str = "You are a Zendesk support ticket creator",
+        query: str,
+        profile: Profile,
+        zendesk: Zendesk,
+        system_message: str = "You are a Zendesk support ticket creator",
 ):
     border_asterisk(query)
     message = f"""{ZENDESK_TICKET_FORMAT_PROMPT}
@@ -213,6 +230,9 @@ async def send_zendesk_ticket(
             messages=messages,
             temperature=0,
             model=CHAT_COMPLETIONS_MODEL,
+            headers={
+                "Helicone-Auth": f"Bearer {helicone_api_key}",
+            }
         )
     )[
         'choices'
